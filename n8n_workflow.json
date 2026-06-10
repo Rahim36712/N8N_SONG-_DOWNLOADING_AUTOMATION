@@ -1,0 +1,71 @@
+{
+  "name": "Song Downloader Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "🎵 Song Downloader",
+        "formDescription": "Enter songs, YouTube URLs, YouTube playlists, or Spotify links — one per line.\nAll songs download in best quality MP3.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Songs",
+              "fieldType": "textarea",
+              "placeholder": "Bohemian Rhapsody Queen\nhttps://youtube.com/watch?v=...\nhttps://youtube.com/playlist?list=...\nhttps://open.spotify.com/playlist/...",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "form-trigger",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "song-downloader-form"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json['Songs'];\nconst songs = raw.split('\\n').map(s => s.trim()).filter(s => s.length > 0);\nif (songs.length === 0) throw new Error('No input provided!');\nreturn songs.map((q, i) => ({ json: { query: q, index: i+1, total: songs.length } }));"
+      },
+      "id": "split-songs",
+      "name": "Split Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "command": "=python C:\\Users\\RJ\\automation\\download_song.py \"{{ $json.query }}\" \"C:\\Users\\RJ\\Music\\AutoDownloads\""
+      },
+      "id": "execute-ytdlp",
+      "name": "Download",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [500, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.stdout;\nlet result;\ntry { result = JSON.parse(raw); }\ncatch(e) { return [{ json: { status:'parse_error', raw } }]; }\nconst prev = $('Split Input').item.json;\nresult.inputIndex = prev.index;\nresult.inputTotal = prev.total;\nresult.originalQuery = prev.query;\nreturn [{ json: result }];"
+      },
+      "id": "parse-output",
+      "name": "Parse Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 0]
+    }
+  ],
+  "connections": {
+    "Form Trigger": {
+      "main": [[{ "node": "Split Input", "type": "main", "index": 0 }]]
+    },
+    "Split Input": {
+      "main": [[{ "node": "Download", "type": "main", "index": 0 }]]
+    },
+    "Download": {
+      "main": [[{ "node": "Parse Result", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "song-downloader-v3" }
+}

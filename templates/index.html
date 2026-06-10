@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Downloader WebUI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --secondary: #ec4899;
+            --bg-color: #030712;
+            --card-bg: rgba(255, 255, 255, 0.02);
+            --card-border: rgba(255, 255, 255, 0.05);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.15) 0%, transparent 40%);
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            padding: 40px;
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+            animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Subtle glowing top border effect */
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 20%;
+            right: 20%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            opacity: 0.5;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 35px;
+            font-size: 1.05rem;
+            font-weight: 400;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            fill: var(--text-muted);
+            transition: fill 0.3s ease;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 18px 20px 18px 55px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            color: var(--text-main);
+            font-size: 1.1rem;
+            outline: none;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 0 4px rgba(99, 102, 241, 0.15);
+        }
+        
+        input[type="text"]:focus + .search-icon {
+            fill: var(--primary);
+        }
+
+        /* Options Toggle */
+        .options-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            cursor: pointer;
+            margin-bottom: 20px;
+            padding: 5px 0;
+            width: fit-content;
+            transition: color 0.2s;
+            user-select: none;
+        }
+        
+        .options-toggle:hover {
+            color: var(--text-main);
+        }
+        
+        .options-toggle svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+            transition: transform 0.3s ease;
+        }
+
+        .options-toggle.active svg {
+            transform: rotate(180deg);
+        }
+
+        /* Options Panel */
+        .options-panel {
+            background: rgba(0,0,0,0.2);
+            border-radius: 16px;
+            border: 1px solid var(--card-border);
+            padding: 20px;
+            margin-bottom: 25px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            
+            /* Animation properties */
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            padding-top: 0;
+            padding-bottom: 0;
+            border-width: 0;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .options-panel.open {
+            max-height: 200px; /* Arbitrary large enough value */
+            opacity: 1;
+            padding: 20px;
+            border-width: 1px;
+        }
+
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .option-group label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+        }
+        
+        select:hover {
+            background-color: rgba(255,255,255,0.08);
+        }
+
+        select:focus {
+            border-color: var(--primary);
+        }
+        
+        select option {
+            background-color: #1e1e24;
+            color: white;
+        }
+
+        button.btn-primary {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border: none;
+            border-radius: 18px;
+            color: white;
+            font-size: 1.15rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.5);
+            overflow: hidden;
+        }
+        
+        /* Button shine effect */
+        button.btn-primary::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.5s ease;
+        }
+
+        button.btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -10px rgba(99, 102, 241, 0.6);
+        }
+        
+        button.btn-primary:hover::after {
+            left: 150%;
+        }
+
+        button.btn-primary:active {
+            transform: translateY(1px);
+            box-shadow: 0 5px 10px -5px rgba(99, 102, 241, 0.6);
+        }
+
+        button.btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Spinner */
+        .spinner {
+            display: none;
+            width: 22px;
+            height: 22px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-card {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 18px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--card-border);
+            display: none;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .status-card.visible {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .status-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+        }
+
+        .status-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .status-success .status-title { color: var(--success); }
+        .status-error .status-title { color: var(--error); }
+        .status-warning .status-title { color: var(--warning); }
+
+        .status-message {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            word-break: break-all;
+        }
+        
+        .status-details {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: #71717a;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Auto Downloader</h1>
+        <p class="subtitle">Enter a song name, YouTube link, or Spotify URL</p>
+
+        <div class="input-group">
+            <input type="text" id="queryInput" placeholder="e.g. Bohemian Rhapsody or https://..." autocomplete="off">
+            <svg class="search-icon" viewBox="0 0 24 24">
+                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+        </div>
+
+        <div class="options-toggle" id="optionsToggle" onclick="toggleOptions()">
+            <svg viewBox="0 0 24 24">
+                <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+            </svg>
+            Advanced Options
+        </div>
+
+        <div class="options-panel" id="optionsPanel">
+            <div class="option-group">
+                <label for="formatSelect">Audio Format</label>
+                <select id="formatSelect">
+                    <option value="mp3">MP3 (Universal)</option>
+                    <option value="flac">FLAC (Lossless)</option>
+                    <option value="m4a">M4A (Apple)</option>
+                    <option value="wav">WAV (Uncompressed)</option>
+                </select>
+            </div>
+            <div class="option-group">
+                <label for="qualitySelect">Audio Quality</label>
+                <select id="qualitySelect">
+                    <option value="0">Best (Highest)</option>
+                    <option value="3">High</option>
+                    <option value="5">Medium</option>
+                    <option value="7">Low</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-primary" id="downloadBtn" onclick="startDownload()">
+            <span id="btnText">Download Now</span>
+            <div class="spinner" id="btnSpinner"></div>
+        </button>
+
+        <div class="status-card" id="statusCard">
+            <div class="status-title" id="statusTitle">
+                <!-- Icon inserted via JS -->
+                <span>Status</span>
+            </div>
+            <div class="status-message" id="statusMessage">Waiting...</div>
+            <div class="status-details" id="statusDetails"></div>
+        </div>
+    </div>
+
+    <script>
+        const input = document.getElementById('queryInput');
+        const btn = document.getElementById('downloadBtn');
+        const btnText = document.getElementById('btnText');
+        const spinner = document.getElementById('btnSpinner');
+        const statusCard = document.getElementById('statusCard');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusMessage = document.getElementById('statusMessage');
+        const statusDetails = document.getElementById('statusDetails');
+        
+        const formatSelect = document.getElementById('formatSelect');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const optionsToggle = document.getElementById('optionsToggle');
+        const optionsPanel = document.getElementById('optionsPanel');
+
+        // Toggle options panel
+        function toggleOptions() {
+            optionsToggle.classList.toggle('active');
+            optionsPanel.classList.toggle('open');
+        }
+
+        // Allow Enter key to trigger download
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') startDownload();
+        });
+
+        // Icons SVG definitions
+        const icons = {
+            success: `<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+            error: `<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+            warning: `<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`
+        };
+
+        async function startDownload() {
+            const query = input.value.trim();
+            if (!query) {
+                input.focus();
+                return;
+            }
+
+            // Set UI to loading state
+            btn.disabled = true;
+            btnText.innerText = "Downloading...";
+            spinner.style.display = "block";
+            
+            // Hide previous results
+            statusCard.className = "status-card"; // reset classes
+            statusDetails.innerHTML = '';
+            statusCard.classList.remove('visible');
+
+            const payload = {
+                query: query,
+                format: formatSelect.value,
+                quality: qualitySelect.value
+            };
+
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                // Show card
+                setTimeout(() => {
+                    statusCard.classList.add('visible');
+                    
+                    if (data.status === 'success') {
+                        statusCard.classList.add('status-success');
+                        statusTitle.innerHTML = `${icons.success} <span>Download Complete</span>`;
+                        statusMessage.innerText = `${data.title || 'Unknown Title'} by ${data.uploader || 'Unknown Artist'}`;
+                        statusDetails.innerHTML = `<span>Format: ${payload.format.toUpperCase()}</span><span>File size: ${data.file_size_mb} MB</span><span>Saved to: ${data.filepath}</span>`;
+                    } else if (data.status === 'playlist_done') {
+                        statusCard.classList.add('status-success');
+                        statusTitle.innerHTML = `${icons.success} <span>Playlist Complete</span>`;
+                        statusMessage.innerText = `Successfully downloaded ${data.downloaded} out of ${data.total} tracks concurrently.`;
+                        statusDetails.innerHTML = `<span>Format: ${payload.format.toUpperCase()}</span>`;
+                    } else if (data.status === 'skipped') {
+                        statusCard.classList.add('status-warning');
+                        statusTitle.innerHTML = `${icons.warning} <span>Skipped</span>`;
+                        statusMessage.innerText = 'This track was already downloaded previously.';
+                    } else {
+                        statusCard.classList.add('status-error');
+                        statusTitle.innerHTML = `${icons.error} <span>Error</span>`;
+                        statusMessage.innerText = data.error || data.message || 'An unknown error occurred.';
+                    }
+                }, 100);
+
+            } catch (err) {
+                setTimeout(() => {
+                    statusCard.classList.add('visible', 'status-error');
+                    statusTitle.innerHTML = `${icons.error} <span>Connection Error</span>`;
+                    statusMessage.innerText = 'Failed to connect to the local API. Ensure the server is running.';
+                    console.error(err);
+                }, 100);
+            } finally {
+                // Reset UI
+                btn.disabled = false;
+                btnText.innerText = "Download Now";
+                spinner.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>
