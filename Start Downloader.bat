@@ -1,29 +1,21 @@
 @echo off
-title Auto Downloader UI & API
+title Auto Song Downloader Web Server
 color 0b
 
-echo ===========================================
-echo   Starting Auto Downloader Web UI / API
-echo ===========================================
+echo ====================================================
+echo   Launching Auto Song Downloader Web App
+echo ====================================================
 echo.
 
-echo Checking requirements (Flask)...
-pip install flask --quiet
+echo Checking Python requirements...
+python -c "import flask" 2>NUL
+if errorlevel 1 (
+    echo Installing Flask...
+    pip install flask --quiet
+)
 
-echo.
-echo Launching your default web browser...
-:: Wait a second for the python server to initialize before opening browser
-start "" http://127.0.0.1:5000
+echo Opening Web App in your default browser...
+start http://127.0.0.1:5000
 
-echo.
-echo ----------------------------------------------------
-echo   Server is running! Keep this window open.
-echo   - Web UI is available at: http://127.0.0.1:5000
-echo   - Local API is available at: POST http://127.0.0.1:5000/api/download
-echo   
-echo   Close this window to stop the server.
-echo ----------------------------------------------------
-echo.
-
+echo Starting Web Server on http://127.0.0.1:5000 ...
 python app.py
-pause

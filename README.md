@@ -1,61 +1,137 @@
-# 🎵 Automated Song Downloader (N8N & Python Pipeline)
+# 🎵 Auto Song Downloader Pro & Music Hub
 
-[![n8n Automation](https://img.shields.io/badge/Orchestrator-n8n-FF6F61?style=for-the-badge&logo=n8n)](https://n8n.io/)
-[![Python 3](https://img.shields.io/badge/Language-Python%203-3776AB?style=for-the-badge&logo=python)](https://python.org/)
-[![Flask API](https://img.shields.io/badge/Framework-Flask-000000?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com/)
-[![Windows Optimized](https://img.shields.io/badge/OS-Windows-0078D6?style=for-the-badge&logo=windows)](https://microsoft.com/)
+<div align="center">
 
-A powerful, production-grade automated song downloading pipeline that merges the visual orchestrating power of **n8n** with a high-performance **Python & yt-dlp/spotdl** backend. It processes track names, YouTube videos, YouTube playlists, and Spotify links in bulk, downloading them concurrently in the best audio quality, maintaining an archive to prevent duplicate downloads, and generating a detailed CSV log.
+![Cool Yellow UI Banner](https://img.shields.io/badge/Design_Theme-Cool_Yellow_%26_Off--White-FACC15?style=for-the-badge&logoColor=0f172a)
+[![Python 3](https://img.shields.io/badge/Language-Python%203.14-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
+[![Flask API](https://img.shields.io/badge/Framework-Flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![yt-dlp](https://img.shields.io/badge/Engine-yt--dlp-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://github.com/yt-dlp/yt-dlp)
+[![spotdl](https://img.shields.io/badge/Spotify-spotdl-1DB954?style=for-the-badge&logo=spotify&logoColor=white)](https://github.com/spotdl/spotify-downloader)
+[![n8n Orchestrator](https://img.shields.io/badge/Orchestrator-n8n-FF6F61?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/)
+[![Windows 11](https://img.shields.io/badge/OS-Windows%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://microsoft.com/)
+
+**An all-in-one, high-performance automated music downloader, local audio streaming player, library manager, and n8n automation pipeline.**
+
+[Features](#-key-features) • [1-Click Launch](#-1-click-desktop-launch) • [Architecture](#-system-architecture) • [API Reference](#-api-reference) • [Setup](#-installation--setup)
+
+</div>
 
 ---
 
-## 🤖 The Core Automation Engine: n8n Workflow
+## ✨ Key Features
 
-This project is built around an **automation-first architecture**. Instead of manually downloading songs or running terminal scripts, the entire pipeline is orchestrated by an **n8n workflow** that handles the request lifecycle.
+### 1. 🖥️ 1-Click Desktop Launcher
+- **Instant Browser Access**: Double-click the **Auto Song Downloader** icon generated directly on your Desktop (`Auto Song Downloader.lnk`).
+- **Silent Background Execution**: Runs silently via [`Start_Silent.vbs`](file:///d:/AI%20STUFF/PROJECTS/automated%20song%20downloader/Start_Silent.vbs) without leaving open terminal windows, automatically launching your default web browser to `http://127.0.0.1:5000`.
+
+### 2. 🎨 Cool Yellow & Off-White Design System
+- **State-of-the-Art Aesthetic**: Built with a **Sonic Yellow (`#FACC15`)** and **Off-White (`#FAF9F5`)** color palette.
+- **Glassmorphic Cards**: Pure white (`#FFFFFF`) containers with crisp border strokes, soft multi-layered shadows, and smooth micro-interactions.
+
+### 3. 🎧 In-Browser Audio Streaming & Player Widget
+- **Play Anywhere**: Listen to downloaded songs directly inside your browser without opening third-party media players.
+- **Floating Vinyl Bar**: Interactive audio bar complete with spinning vinyl disc animation, seek bar, time display, volume controls, and a 1-click **Close `(X)` Button** to stop playback and hide the player.
+
+### 4. 🎵 Music Library & Explorer Manager
+- **Live Search & Filter**: Instantly search your library by song title, artist, or file format.
+- **File Metadata & Tags**: Displays format tags (`MP3`, `FLAC`, `M4A`, `WAV`), file size in MB, and download dates.
+- **Open Downloads Folder Button**: Opens your local music destination (`C:\Users\RJ\Music\AutoDownloads`) directly in Windows File Explorer with one click.
+- **1-Click Track Deletion**: Cleanly delete tracks from disk directly from the Web UI.
+
+### 5. ⚡ Multi-Source & Multi-Line Batch Queue
+- **Universal Input Support**: Handles YouTube video URLs, YouTube playlists, Spotify tracks/playlists, YouTube Music links, and plain text song search queries.
+- **Batch Queue Downloader**: Paste multiple URLs or titles line-by-line in the text area to process batch downloads concurrently.
+- **Concurrent Processing**: Multithreaded execution using Python `ThreadPoolExecutor` for fast multi-track downloading.
+
+### 6. 📊 System Diagnostics Dashboard
+- **Health Diagnostics Tab**: Real-time status reporting for Python, yt-dlp, FFmpeg audio encoder, spotdl, total download count, and disk space usage.
+
+### 7. 🛡️ Duplicate Prevention & CSV Logging
+- **Smart Archive**: Uses a persistent archive file (`.downloaded.txt`) to avoid downloading identical songs twice.
+- **Transparent CSV Logs**: Appends every completed task to `download_log.csv` with timestamps, file size, artist name, and file path.
+
+---
+
+## 🛠️ System Architecture
 
 ```mermaid
 flowchart TD
-    A["📝 n8n Form Trigger\n(User inputs batch songs/URLs)"] --> B["⚡ Split Input Node\n(JavaScript parses input into items)"]
-    B --> C["⚙️ Download Node\n(Executes download_song.py command)"]
-    C --> D["📊 Parse Result Node\n(JavaScript reads stdout, formats JSON)"]
-    D --> E["✅ Done / API Response\n(Downloads saved to Music folder)"]
+    subgraph Client ["Client Interfaces"]
+        A1["🖥️ Desktop Shortcut\n(Auto Song Downloader.lnk)"] --> B1["🤫 Start_Silent.vbs\n(Silent Launcher)"]
+        A2["🌐 Web Browser\n(http://127.0.0.1:5000)"]
+        A3["🤖 n8n Workflow Form\n(Webhook Orchestrator)"]
+    end
 
-    style A fill:#FF6F61,stroke:#fff,stroke-width:2px,color:#fff
-    style B fill:#FF9F43,stroke:#fff,stroke-width:2px,color:#fff
-    style C fill:#48DBFB,stroke:#fff,stroke-width:2px,color:#333
-    style D fill:#1DD1A1,stroke:#fff,stroke-width:2px,color:#fff
-    style E fill:#10AC84,stroke:#fff,stroke-width:2px,color:#fff
+    subgraph Backend ["Python & Flask Backend"]
+        B1 --> C1["⚡ app.py Server\n(Flask Web App & REST APIs)"]
+        A2 <--> C1
+        A3 <--> C2["⚙️ download_song.py\n(yt-dlp + spotdl Engine)"]
+        C1 <--> C2
+    end
+
+    subgraph Storage ["Local Storage & Engines"]
+        C2 --> D1["🎵 Music Library\n(C:\\Users\\RJ\\Music\\AutoDownloads)"]
+        C2 --> D2["🛡️ Download Archive\n(.downloaded.txt)"]
+        C2 --> D3["📊 Download Log\n(download_log.csv)"]
+    end
+
+    style A1 fill:#FACC15,stroke:#0F172A,stroke-width:2px,color:#0F172A
+    style B1 fill:#F59E0B,stroke:#0F172A,stroke-width:2px,color:#0F172A
+    style C1 fill:#6366F1,stroke:#fff,stroke-width:2px,color:#fff
+    style C2 fill:#3B82F6,stroke:#fff,stroke-width:2px,color:#fff
+    style D1 fill:#10B981,stroke:#fff,stroke-width:2px,color:#fff
 ```
-
-### N8N Workflow Nodes Breakdown
-
-1. **Form Trigger (`Form Trigger`)**: 
-   An interactive web-based interface where users paste search queries or URLs (one per line). It serves as the primary webhook entrance.
-2. **Split Input (`Code Node - JS`)**:
-   Splits the raw text area value by newlines, trims whitespace, filters empty lines, and outputs a clean batch list.
-   ```javascript
-   const raw = $input.first().json['Songs'];
-   const songs = raw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-   if (songs.length === 0) throw new Error('No input provided!');
-   return songs.map((q, i) => ({ json: { query: q, index: i+1, total: songs.length } }));
-   ```
-3. **Download CLI Executor (`Execute Command Node`)**:
-   Executes the local python script using safe shell arguments to download and convert the track:
-   ```bash
-   python C:\Users\RJ\automation\download_song.py "{{ $json.query }}" "C:\Users\RJ\Music\AutoDownloads"
-   ```
-4. **Parse Result (`Code Node - JS`)**:
-   Captures standard output, parses the Python script's JSON string, and structures it into metadata keys (`status`, `title`, `uploader`, `filepath`, `file_size_mb`, `url`) for downstream automations (e.g. notifications, database logging, or media library sync).
 
 ---
 
-## ✨ Features
+## 🚀 1-Click Desktop Launch
 
-- **🌐 Multi-Source Routing**: Automatically routes links from YouTube (videos & playlists) and Spotify (tracks & playlists), or falls back to YouTube search queries for plain text track names.
-- **⚡ Concurrent Downloading**: Employs Python `ThreadPoolExecutor` (4 parallel threads) for fast processing of playlists.
-- **🛡️ Smart Deduplication**: Features a persistent binary database log (`.downloaded.txt`) that skips already downloaded songs, saving bandwidth and disk space.
-- **📊 Logging & Transparency**: Appends every action to a shared `download_log.csv` tracking timestamps, download status, file paths, and metadata.
-- **🖥️ Dual Interface**: Use the n8n automation pipeline or run the Flask-based Web UI / REST API.
+Simply double-click the **Auto Song Downloader** icon on your Desktop!
+
+- **Target Script**: [`Start_Silent.vbs`](file:///d:/AI%20STUFF/PROJECTS/automated%20song%20downloader/Start_Silent.vbs)
+- **Batch Launcher**: [`Start Downloader.bat`](file:///d:/AI%20STUFF/PROJECTS/automated%20song%20downloader/Start%20Downloader.bat)
+- **Re-create Desktop Shortcut**:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File "Create_Desktop_Shortcut.ps1"
+  ```
+
+---
+
+## 📡 API Reference
+
+The Flask backend provides RESTful JSON endpoints for external integration:
+
+| Method | Endpoint | Description | Payload / Response |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/download` | Single track or playlist download | `{ "query": "Song or URL", "format": "mp3", "quality": "0" }` |
+| `POST` | `/api/batch_download` | Process multi-line batch download queue | `{ "queries": ["Song 1", "Song 2"], "format": "mp3" }` |
+| `GET` | `/api/library` | List all downloaded music files with metadata | `{ "status": "success", "library": [...] }` |
+| `GET` | `/api/stream/<filename>` | Stream audio file directly to browser | HTML5 Audio Stream (`audio/mpeg`, etc.) |
+| `POST` | `/api/open_folder` | Opens `AutoDownloads` in Windows File Explorer | `{ "status": "success", "message": "Opened folder" }` |
+| `GET` | `/api/system_info` | Get system status for Python, yt-dlp, FFmpeg | `{ "diagnostics": { "ffmpeg": "...", "total_files": 16 } }` |
+| `POST` | `/api/delete` | Delete a music file from disk | `{ "filename": "Song.mp3" }` |
+
+---
+
+## ⚙️ Installation & Setup
+
+### 1. Automated Setup Script
+Run PowerShell as **Administrator** inside this project directory:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\setup.ps1
+```
+This script automatically:
+- Checks Python and installs required packages (`yt-dlp`, `spotdl`, `flask`).
+- Checks Node.js and installs `n8n` globally.
+- Installs `FFmpeg` via `winget`.
+- Configures environment variables and output directories.
+
+### 2. Manual Server Startup
+```bash
+python app.py
+```
+Open `http://127.0.0.1:5000` in your web browser.
 
 ---
 
@@ -63,64 +139,30 @@ flowchart TD
 
 ```
 AUTOMATION-SONG/
-│
-├── app.py                      # Flask API & GUI host
-├── download_song.py            # Core Python Downloader CLI (called by n8n)
-├── n8n_workflow.json           # Pre-configured n8n workflow definition
-├── setup.ps1                   # Automated setup script (Installs Node, n8n, Python packages, FFmpeg)
-├── Start Downloader.bat        # Double-click launcher for local Flask GUI
-├── .gitignore                  # Git ignore files configuration
+├── app.py                      # Flask Server, REST APIs, & Streaming Engine
+├── download_song.py            # Core Media Extraction Engine (yt-dlp + spotdl)
+├── Create_Desktop_Shortcut.ps1 # PowerShell Desktop Shortcut Generator
+├── Start_Silent.vbs            # Silent Background Window Launcher
+├── Start Downloader.bat        # Command Launcher Script
+├── setup.ps1                   # Automated Setup & Dependency Installer
+├── n8n_workflow.json           # n8n Orchestrator Workflow import file
+├── README.md                   # Application Documentation
 └── templates/
-    └── index.html              # Frontend UI for Flask server
-```
-
----
-
-## 🚀 Setup & Installation
-
-### 1. Automated Script Setup
-Right-click PowerShell, select **Run as Administrator**, navigate to this folder, and run:
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\setup.ps1
-```
-This script will:
-- Check for Python and install Python requirements (`yt-dlp`, `spotdl`, `flask`).
-- Check for Node.js and install `n8n` globally.
-- Set up necessary Windows environment configurations.
-- Configure folder paths (`C:\Users\RJ\automation` and `C:\Users\RJ\Music\AutoDownloads`).
-
-### 2. Import the Workflow into n8n
-1. Start n8n in your command prompt:
-   ```bash
-   n8n start
-   ```
-2. Open n8n in your browser (usually `http://localhost:5678`).
-3. Click the menu -> **Workflows** -> **Import from file...** and select [n8n_workflow.json](file:///d:/AI%20STUFF/PROJECTS/automated%20song%20downloader/n8n_workflow.json).
-4. Save and activate the workflow.
-
----
-
-## 🛠️ Usage
-
-### Via n8n Form (Recommended)
-1. Open your active workflow's Form URL inside n8n.
-2. Enter your songs or playlist links.
-3. Press **Submit**. Watch the workflow pull metadata and download your music in real-time.
-
-### Via Flask GUI / API
-Double-click `Start Downloader.bat`. It will spin up a web server at `http://127.0.0.1:5000` and open your default browser with a visual dashboard.
-
-### Standalone CLI
-You can execute downloads directly from terminal:
-```bash
-python download_song.py "https://open.spotify.com/track/..."
+    └── index.html              # Cool Yellow & Off-White Frontend Interface
 ```
 
 ---
 
 ## 📝 Technologies Used
+* **Frontend**: HTML5, CSS3 Vanilla Glassmorphism, JavaScript ES6+
+* **Backend API**: Python 3.14, Flask
+* **Media Extraction**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) & [spotdl](https://github.com/spotdl/spotify-downloader)
+* **Audio Encoder**: FFmpeg
 * **Automation Orchestrator**: [n8n](https://n8n.io/)
-* **Media Downloader & Converter**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) & [spotdl](https://github.com/spotdl/spotify-downloader)
-* **Backend Web Server**: Python Flask
-* **Automation Scripting**: PowerShell v5
+* **Operating System**: Windows 11
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ for Seamless Music Downloading & Local Streaming.</sub>
+</div>

@@ -3,97 +3,280 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Downloader WebUI</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Auto Song Downloader & Music Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #6366f1;
-            --primary-hover: #4f46e5;
-            --secondary: #ec4899;
-            --bg-color: #030712;
-            --card-bg: rgba(255, 255, 255, 0.02);
-            --card-border: rgba(255, 255, 255, 0.05);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --success: #10b981;
-            --error: #ef4444;
-            --warning: #f59e0b;
+            /* Cool Yellow & Off-White Palette */
+            --primary: #facc15 !important;          /* Cool Sonic Yellow */
+            --primary-hover: #eab308 !important;    /* Warm Golden Yellow */
+            --primary-dark: #ca8a04 !important;     /* Deep Gold */
+            --primary-glow: rgba(250, 204, 21, 0.4) !important;
+            --accent: #f59e0b !important;           /* Electric Amber */
+            --bg-color: #faf9f5 !important;         /* Premium Off-White Canvas */
+            --bg-subtle: #f4f2ea !important;        /* Subtle Off-White Neutral */
+            --card-bg: #ffffff !important;          /* Pure Milk White */
+            --card-border: #e2e8f0 !important;      /* Crisp Light Border */
+            --card-border-active: #facc15 !important;/* Yellow Highlight Border */
+            --text-main: #0f172a !important;        /* Deep Slate Charcoal */
+            --text-muted: #64748b !important;       /* Muted Slate */
+            --text-dim: #94a3b8 !important;         /* Light Slate Meta */
+            --success: #10b981 !important;          /* Emerald Green */
+            --error: #ef4444 !important;           /* Coral Red */
+            --warning: #d97706 !important;         /* Amber Warning */
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Hanken Grotesk', sans-serif;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
+            background-color: #faf9f5 !important;
+            color: #0f172a !important;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px 120px 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Warm Light Mesh Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -15%;
+            left: -10%;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, rgba(250, 204, 21, 0.18) 0%, transparent 65%);
+            border-radius: 50%;
+            filter: blur(90px);
+            z-index: -1;
+            animation: floatGlow 14s infinite alternate ease-in-out;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -15%;
+            right: -10%;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.14) 0%, transparent 65%);
+            border-radius: 50%;
+            filter: blur(90px);
+            z-index: -1;
+            animation: floatGlow 18s infinite alternate-reverse ease-in-out;
+        }
+
+        @keyframes floatGlow {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(40px, 30px) scale(1.1); }
+        }
+
+        /* Header Navigation */
+        .header {
+            width: 100%;
+            max-width: 920px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 16px 24px;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%) !important;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.15) 0%, transparent 40%);
-            padding: 20px;
+            box-shadow: 0 4px 15px rgba(250, 204, 21, 0.4);
         }
 
-        .container {
+        .brand-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: #0f172a;
+        }
+
+        .brand-title {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #0f172a !important;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 6px;
+            background: #f4f2ea !important;
+            padding: 6px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0 !important;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #64748b !important;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn svg {
+            width: 17px;
+            height: 17px;
+            fill: currentColor;
+        }
+
+        .tab-btn:hover {
+            color: #0f172a !important;
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .tab-btn.active {
+            background: #facc15 !important;
+            color: #0f172a !important;
+            box-shadow: 0 4px 14px rgba(250, 204, 21, 0.4);
+        }
+
+        /* Main Container */
+        .main-wrapper {
             width: 100%;
-            max-width: 600px;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 28px;
-            padding: 40px;
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
-            animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            position: relative;
-            overflow: hidden;
+            max-width: 920px;
         }
 
-        /* Subtle glowing top border effect */
-        .container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 20%;
-            right: 20%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            opacity: 0.5;
+        .tab-content {
+            display: none;
+            animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .tab-content.active {
+            display: block;
         }
 
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
+            from { opacity: 0; transform: translateY(14px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        h1 {
-            font-size: 2.5rem;
+        /* Glass / Card Container */
+        .glass-card {
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 28px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(0,0,0,0.02);
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .card-header {
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 1.7rem;
             font-weight: 800;
-            text-align: center;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -1px;
+            color: #0f172a !important;
+            margin-bottom: 6px;
+            letter-spacing: -0.6px;
         }
 
-        p.subtitle {
-            text-align: center;
-            color: var(--text-muted);
-            margin-bottom: 35px;
-            font-size: 1.05rem;
-            font-weight: 400;
+        .card-subtitle {
+            color: #64748b !important;
+            font-size: 0.98rem;
+            font-weight: 500;
         }
 
+        /* Mode Switcher Chips */
+        .mode-switcher {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .mode-chip {
+            padding: 10px 18px;
+            background: #f4f2ea !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #64748b !important;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mode-chip:hover {
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        .mode-chip.active {
+            background: #ffffff !important;
+            border-color: #ca8a04 !important;
+            color: #0f172a !important;
+            box-shadow: 0 2px 8px rgba(250, 204, 21, 0.25);
+        }
+
+        /* Input Controls */
         .input-group {
             position: relative;
             margin-bottom: 20px;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            background: #faf9f5 !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 18px;
+            color: #0f172a !important;
+            font-size: 1.02rem;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.25s ease;
+        }
+
+        input[type="text"] {
+            padding: 18px 20px 18px 54px;
+        }
+
+        textarea {
+            padding: 18px 20px;
+            height: 120px;
+            resize: vertical;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            background: #ffffff !important;
+            border-color: #ca8a04 !important;
+            box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.4) !important;
         }
 
         .search-icon {
@@ -103,419 +286,1074 @@
             transform: translateY(-50%);
             width: 20px;
             height: 20px;
-            fill: var(--text-muted);
-            transition: fill 0.3s ease;
+            fill: #64748b !important;
+            transition: fill 0.25s;
         }
 
-        input[type="text"] {
-            width: 100%;
-            padding: 18px 20px 18px 55px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--card-border);
-            border-radius: 18px;
-            color: var(--text-main);
-            font-size: 1.1rem;
-            outline: none;
-            transition: all 0.3s ease;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        input[type="text"]:focus {
-            border-color: var(--primary);
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 0 4px rgba(99, 102, 241, 0.15);
-        }
-        
         input[type="text"]:focus + .search-icon {
-            fill: var(--primary);
+            fill: #ca8a04 !important;
         }
 
-        /* Options Toggle */
-        .options-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--text-muted);
-            font-size: 0.95rem;
-            cursor: pointer;
-            margin-bottom: 20px;
-            padding: 5px 0;
-            width: fit-content;
-            transition: color 0.2s;
-            user-select: none;
-        }
-        
-        .options-toggle:hover {
-            color: var(--text-main);
-        }
-        
-        .options-toggle svg {
-            width: 16px;
-            height: 16px;
-            fill: currentColor;
-            transition: transform 0.3s ease;
-        }
-
-        .options-toggle.active svg {
-            transform: rotate(180deg);
-        }
-
-        /* Options Panel */
-        .options-panel {
-            background: rgba(0,0,0,0.2);
-            border-radius: 16px;
-            border: 1px solid var(--card-border);
-            padding: 20px;
-            margin-bottom: 25px;
+        /* Options Grid */
+        .options-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            
-            /* Animation properties */
-            max-height: 0;
-            opacity: 0;
-            overflow: hidden;
-            padding-top: 0;
-            padding-bottom: 0;
-            border-width: 0;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .options-panel.open {
-            max-height: 200px; /* Arbitrary large enough value */
-            opacity: 1;
+            gap: 16px;
+            margin-bottom: 24px;
+            background: #f4f2ea !important;
             padding: 20px;
-            border-width: 1px;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0 !important;
         }
 
-        .option-group {
+        .option-field {
             display: flex;
             flex-direction: column;
             gap: 8px;
         }
 
-        .option-group label {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--text-muted);
+        .option-field label {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: #64748b !important;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
         }
 
         select {
             width: 100%;
-            padding: 12px 15px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            color: var(--text-main);
+            padding: 12px 16px;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px;
+            color: #0f172a !important;
             font-size: 0.95rem;
+            font-weight: 600;
             outline: none;
             cursor: pointer;
             transition: all 0.2s;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 15px center;
+            background-position: right 16px center;
         }
-        
+
         select:hover {
-            background-color: rgba(255,255,255,0.08);
+            border-color: #ca8a04 !important;
         }
 
         select:focus {
-            border-color: var(--primary);
-        }
-        
-        select option {
-            background-color: #1e1e24;
-            color: white;
+            border-color: #ca8a04 !important;
+            box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.4) !important;
         }
 
-        button.btn-primary {
+        /* Primary Action Button */
+        .btn-action {
             width: 100%;
             padding: 18px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%) !important;
             border: none;
             border-radius: 18px;
-            color: white;
-            font-size: 1.15rem;
-            font-weight: 600;
+            color: #0f172a !important;
+            font-size: 1.1rem;
+            font-weight: 800;
             cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.5);
-            overflow: hidden;
-        }
-        
-        /* Button shine effect */
-        button.btn-primary::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 50%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transform: skewX(-20deg);
-            transition: left 0.5s ease;
+            gap: 10px;
+            box-shadow: 0 10px 25px -4px rgba(250, 204, 21, 0.4);
+            letter-spacing: -0.2px;
         }
 
-        button.btn-primary:hover {
+        .btn-action:hover {
             transform: translateY(-2px);
-            box-shadow: 0 15px 25px -10px rgba(99, 102, 241, 0.6);
-        }
-        
-        button.btn-primary:hover::after {
-            left: 150%;
+            box-shadow: 0 14px 30px -4px rgba(250, 204, 21, 0.4), 0 0 15px rgba(245, 158, 11, 0.3);
         }
 
-        button.btn-primary:active {
+        .btn-action:active {
             transform: translateY(1px);
-            box-shadow: 0 5px 10px -5px rgba(99, 102, 241, 0.6);
         }
 
-        button.btn-primary:disabled {
-            opacity: 0.7;
+        .btn-action:disabled {
+            opacity: 0.65;
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
         }
 
+        .btn-secondary {
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #0f172a !important;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .btn-secondary:hover {
+            background: #f4f2ea !important;
+            border-color: #cbd5e1 !important;
+        }
+
         /* Spinner */
         .spinner {
             display: none;
-            width: 22px;
-            height: 22px;
-            border: 3px solid rgba(255,255,255,0.3);
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(15, 23, 42, 0.2);
             border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+            border-top-color: #0f172a;
+            animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        .status-card {
-            margin-top: 25px;
+        /* Status Output Box */
+        .status-box {
+            margin-top: 24px;
             padding: 20px;
-            border-radius: 18px;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            background: #f4f2ea !important;
+            border: 1px solid #e2e8f0 !important;
             display: none;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: slideUp 0.3s ease;
         }
 
-        .status-card.visible {
-            display: block;
-            opacity: 1;
-            transform: translateY(0);
-        }
+        .status-box.visible { display: block; }
+        .status-box.success { border-color: rgba(16, 185, 129, 0.3) !important; background: rgba(16, 185, 129, 0.06) !important; }
+        .status-box.error { border-color: rgba(239, 68, 68, 0.3) !important; background: rgba(239, 68, 68, 0.06) !important; }
+        .status-box.warning { border-color: rgba(217, 119, 6, 0.3) !important; background: rgba(245, 158, 11, 0.06) !important; }
 
-        .status-title {
-            font-weight: 600;
-            margin-bottom: 8px;
+        .status-header {
             display: flex;
             align-items: center;
             gap: 10px;
+            font-weight: 800;
             font-size: 1.1rem;
+            margin-bottom: 8px;
         }
 
-        .status-icon {
-            width: 20px;
-            height: 20px;
-        }
+        .status-box.success .status-header { color: #10b981 !important; }
+        .status-box.error .status-header { color: #ef4444 !important; }
+        .status-box.warning .status-header { color: #d97706 !important; }
 
-        .status-success .status-title { color: var(--success); }
-        .status-error .status-title { color: var(--error); }
-        .status-warning .status-title { color: var(--warning); }
-
-        .status-message {
-            color: var(--text-muted);
+        .status-body {
+            color: #64748b !important;
             font-size: 0.95rem;
-            line-height: 1.6;
-            word-break: break-all;
+            line-height: 1.5;
+            font-weight: 500;
         }
-        
-        .status-details {
-            margin-top: 12px;
+
+        /* Track Preview Card */
+        .preview-card {
+            display: none;
+            align-items: center;
+            gap: 16px;
+            background: #f4f2ea !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 16px;
+            border-radius: 18px;
+            margin-bottom: 20px;
+        }
+
+        .preview-card.visible { display: flex; }
+        .preview-thumb {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: #e2e8f0;
+        }
+
+        .preview-title {
+            font-weight: 800;
+            font-size: 1rem;
+            color: #0f172a !important;
+        }
+
+        .preview-artist {
             font-size: 0.85rem;
-            color: #71717a;
-            border-top: 1px solid rgba(255,255,255,0.05);
-            padding-top: 12px;
+            color: #64748b !important;
+            margin-top: 2px;
+        }
+
+        /* Library List & Items */
+        .library-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .search-library-input {
+            padding: 12px 16px;
+            background: #faf9f5 !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px;
+            color: #0f172a !important;
+            font-size: 0.9rem;
+            font-weight: 500;
+            width: 280px;
+            outline: none;
+        }
+
+        .search-library-input:focus {
+            border-color: #ca8a04 !important;
+            box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.4) !important;
+        }
+
+        .library-list {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 12px;
+            max-height: 480px;
+            overflow-y: auto;
+            padding-right: 6px;
         }
+
+        .track-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: #faf9f5 !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 18px;
+            transition: all 0.2s ease;
+        }
+
+        .track-item:hover {
+            background: #ffffff !important;
+            border-color: #ca8a04 !important;
+            box-shadow: 0 4px 15px rgba(15, 23, 42, 0.03);
+            transform: translateX(4px);
+        }
+
+        .track-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .play-btn-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #facc15 !important;
+            border: none;
+            color: #0f172a !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(250, 204, 21, 0.4);
+            flex-shrink: 0;
+        }
+
+        .play-btn-circle:hover {
+            transform: scale(1.1);
+            background: #eab308 !important;
+        }
+
+        .play-btn-circle svg {
+            width: 18px;
+            height: 18px;
+            fill: #0f172a;
+            margin-left: 2px;
+        }
+
+        .track-details {
+            overflow: hidden;
+        }
+
+        .track-title {
+            font-weight: 800;
+            font-size: 0.96rem;
+            color: #0f172a !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .track-artist {
+            font-size: 0.83rem;
+            color: #64748b !important;
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        .track-tags {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: 16px;
+            flex-shrink: 0;
+        }
+
+        .tag-fmt {
+            padding: 4px 10px;
+            background: rgba(250, 204, 21, 0.25) !important;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #854d0e !important;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tag-size {
+            font-size: 0.82rem;
+            color: #64748b !important;
+            font-weight: 600;
+        }
+
+        .delete-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8 !important;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .delete-btn:hover {
+            color: #ef4444 !important;
+            background: rgba(239, 68, 68, 0.1) !important;
+        }
+
+        .delete-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        /* Sticky Audio Player Bar */
+        .player-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 40px);
+            max-width: 880px;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 24px;
+            padding: 14px 24px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12), 0 0 25px rgba(250, 204, 21, 0.4);
+            z-index: 999;
+            animation: playerSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .player-bar.active {
+            display: flex;
+        }
+
+        @keyframes playerSlideUp {
+            from { transform: translate(-50%, 40px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        .player-track-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            max-width: 250px;
+        }
+
+        .player-disc {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: rotateDisc 8s linear infinite;
+            box-shadow: 0 4px 10px rgba(250, 204, 21, 0.4);
+        }
+
+        .player-disc.paused {
+            animation-play-state: paused;
+        }
+
+        @keyframes rotateDisc {
+            to { transform: rotate(360deg); }
+        }
+
+        .player-disc svg {
+            width: 20px;
+            height: 20px;
+            fill: #0f172a;
+        }
+
+        .player-title {
+            font-weight: 800;
+            font-size: 0.92rem;
+            color: #0f172a !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-artist {
+            font-size: 0.78rem;
+            color: #64748b !important;
+            font-weight: 500;
+        }
+
+        .player-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            max-width: 400px;
+            margin: 0 16px;
+        }
+
+        .player-btn-main {
+            background: #0f172a !important;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
+        }
+
+        .player-btn-main:hover {
+            transform: scale(1.1);
+        }
+
+        .player-btn-main svg {
+            width: 16px;
+            height: 16px;
+            fill: #ffffff;
+            margin-left: 1px;
+        }
+
+        .progress-container {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .time-str {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #64748b !important;
+            width: 38px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .progress-bar-bg {
+            flex: 1;
+            height: 6px;
+            background: #f4f2ea !important;
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #facc15 0%, #f59e0b 100%) !important;
+            border-radius: 10px;
+        }
+
+        /* Player Close (X) Button */
+        .player-close-btn {
+            background: #f4f2ea !important;
+            border: 1px solid #e2e8f0 !important;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #64748b !important;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .player-close-btn:hover {
+            background: #ef4444 !important;
+            color: #ffffff !important;
+            border-color: #ef4444 !important;
+            transform: scale(1.08);
+        }
+
+        .player-close-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        /* Diagnostics Cards Grid */
+        .diag-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .diag-card {
+            background: #faf9f5 !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .diag-label {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: #64748b !important;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .diag-val {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #0f172a !important;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            width: fit-content;
+        }
+
+        .status-pill.ok { background: rgba(16, 185, 129, 0.15) !important; color: #047857 !important; }
+        .status-pill.missing { background: rgba(239, 68, 68, 0.15) !important; color: #b91c1c !important; }
 
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Auto Downloader</h1>
-        <p class="subtitle">Enter a song name, YouTube link, or Spotify URL</p>
-
-        <div class="input-group">
-            <input type="text" id="queryInput" placeholder="e.g. Bohemian Rhapsody or https://..." autocomplete="off">
-            <svg class="search-icon" viewBox="0 0 24 24">
-                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-            </svg>
-        </div>
-
-        <div class="options-toggle" id="optionsToggle" onclick="toggleOptions()">
-            <svg viewBox="0 0 24 24">
-                <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
-            </svg>
-            Advanced Options
-        </div>
-
-        <div class="options-panel" id="optionsPanel">
-            <div class="option-group">
-                <label for="formatSelect">Audio Format</label>
-                <select id="formatSelect">
-                    <option value="mp3">MP3 (Universal)</option>
-                    <option value="flac">FLAC (Lossless)</option>
-                    <option value="m4a">M4A (Apple)</option>
-                    <option value="wav">WAV (Uncompressed)</option>
-                </select>
+    <!-- Header Navigation -->
+    <header class="header">
+        <div class="brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                </svg>
             </div>
-            <div class="option-group">
-                <label for="qualitySelect">Audio Quality</label>
-                <select id="qualitySelect">
-                    <option value="0">Best (Highest)</option>
-                    <option value="3">High</option>
-                    <option value="5">Medium</option>
-                    <option value="7">Low</option>
-                </select>
+            <div class="brand-title">Auto Downloader Pro</div>
+        </div>
+
+        <nav class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('downloaderTab', this)">
+                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                Downloader
+            </button>
+            <button class="tab-btn" onclick="switchTab('libraryTab', this)">
+                <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                Library
+            </button>
+            <button class="tab-btn" onclick="switchTab('systemTab', this)">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                System
+            </button>
+        </nav>
+    </header>
+
+    <main class="main-wrapper">
+        
+        <!-- Tab 1: Downloader -->
+        <section id="downloaderTab" class="tab-content active">
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2 class="card-title">Download Music & Playlists</h2>
+                    <p class="card-subtitle">Support for YouTube, Spotify URLs, and Song Names</p>
+                </div>
+
+                <!-- Mode Chips -->
+                <div class="mode-switcher">
+                    <div class="mode-chip active" id="chipSingle" onclick="setMode('single')">Single Song / URL</div>
+                    <div class="mode-chip" id="chipBatch" onclick="setMode('batch')">Batch Queue (Multi-line)</div>
+                </div>
+
+                <!-- Single Mode Input -->
+                <div id="singleInputBlock" class="input-group">
+                    <input type="text" id="queryInput" placeholder="e.g. Bohemian Rhapsody or https://..." autocomplete="off">
+                    <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                </div>
+
+                <!-- Batch Mode Input -->
+                <div id="batchInputBlock" class="input-group" style="display: none;">
+                    <textarea id="batchQueryInput" placeholder="Enter song names or URLs (one per line):&#10;Bohemian Rhapsody&#10;https://open.spotify.com/track/...&#10;Hotel California"></textarea>
+                </div>
+
+                <!-- Options Grid -->
+                <div class="options-grid">
+                    <div class="option-field">
+                        <label for="formatSelect">Audio Format</label>
+                        <select id="formatSelect">
+                            <option value="mp3">MP3 (Universal)</option>
+                            <option value="flac">FLAC (Lossless High Quality)</option>
+                            <option value="m4a">M4A (Apple AAC)</option>
+                            <option value="wav">WAV (Uncompressed)</option>
+                        </select>
+                    </div>
+                    <div class="option-field">
+                        <label for="qualitySelect">Audio Bitrate</label>
+                        <select id="qualitySelect">
+                            <option value="0">320kbps (Best Quality)</option>
+                            <option value="3">256kbps (High Quality)</option>
+                            <option value="5">192kbps (Medium Quality)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Preview Card -->
+                <div class="preview-card" id="previewCard">
+                    <img class="preview-thumb" id="prevThumb" src="" alt="Track Cover">
+                    <div class="preview-info">
+                        <div class="preview-title" id="prevTitle">Loading preview...</div>
+                        <div class="preview-artist" id="prevArtist">Artist</div>
+                    </div>
+                </div>
+
+                <!-- Download Action Button -->
+                <button class="btn-action" id="downloadBtn" onclick="startDownload()">
+                    <span id="btnText">Download Now</span>
+                    <div class="spinner" id="btnSpinner"></div>
+                </button>
+
+                <!-- Status Output Box -->
+                <div class="status-box" id="statusBox">
+                    <div class="status-header" id="statusHeader">
+                        <span id="statusTitle">Status</span>
+                    </div>
+                    <div class="status-body" id="statusBody"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 2: Music Library -->
+        <section id="libraryTab" class="tab-content">
+            <div class="glass-card">
+                <div class="card-header">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h2 class="card-title">Music Library</h2>
+                            <p class="card-subtitle">Listen to downloaded songs directly in browser</p>
+                        </div>
+                        <button class="btn-secondary" onclick="openMusicFolder()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+                            Open Folder
+                        </button>
+                    </div>
+                </div>
+
+                <div class="library-controls">
+                    <input type="text" class="search-library-input" id="librarySearch" placeholder="Search title or artist..." oninput="filterLibrary()">
+                    <span id="libraryCountText" style="font-size: 0.85rem; color: #64748b; font-weight: 700;">0 tracks</span>
+                </div>
+
+                <div class="library-list" id="libraryList">
+                    <!-- Dynamic track items -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 3: System Diagnostics -->
+        <section id="systemTab" class="tab-content">
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2 class="card-title">System Status & Environment</h2>
+                    <p class="card-subtitle">Installed tool packages and storage statistics</p>
+                </div>
+
+                <div class="diag-grid" id="diagGrid">
+                    <!-- Dynamic Diagnostic Cards -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Sticky Audio Player Bar -->
+    <div class="player-bar" id="playerBar">
+        <div class="player-track-info">
+            <div class="player-disc" id="playerDisc">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/></svg>
+            </div>
+            <div style="overflow: hidden;">
+                <div class="player-title" id="playerTitle">Select a track to play</div>
+                <div class="player-artist" id="playerArtist">Auto Downloader Pro</div>
             </div>
         </div>
 
-        <button class="btn-primary" id="downloadBtn" onclick="startDownload()">
-            <span id="btnText">Download Now</span>
-            <div class="spinner" id="btnSpinner"></div>
+        <div class="player-controls">
+            <button class="player-btn-main" id="playerPlayBtn" onclick="togglePlay()">
+                <svg id="playIconSVG" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div class="progress-container">
+                <span class="time-str" id="currentTime">0:00</span>
+                <div class="progress-bar-bg" onclick="seekAudio(event)">
+                    <div class="progress-bar-fill" id="progressFill"></div>
+                </div>
+                <span class="time-str" id="durationTime">0:00</span>
+            </div>
+        </div>
+
+        <!-- Close Player Button -->
+        <button class="player-close-btn" onclick="closePlayer()" title="Close Player & Stop Audio">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
-
-        <div class="status-card" id="statusCard">
-            <div class="status-title" id="statusTitle">
-                <!-- Icon inserted via JS -->
-                <span>Status</span>
-            </div>
-            <div class="status-message" id="statusMessage">Waiting...</div>
-            <div class="status-details" id="statusDetails"></div>
-        </div>
     </div>
 
-    <script>
-        const input = document.getElementById('queryInput');
-        const btn = document.getElementById('downloadBtn');
-        const btnText = document.getElementById('btnText');
-        const spinner = document.getElementById('btnSpinner');
-        const statusCard = document.getElementById('statusCard');
-        const statusTitle = document.getElementById('statusTitle');
-        const statusMessage = document.getElementById('statusMessage');
-        const statusDetails = document.getElementById('statusDetails');
-        
-        const formatSelect = document.getElementById('formatSelect');
-        const qualitySelect = document.getElementById('qualitySelect');
-        const optionsToggle = document.getElementById('optionsToggle');
-        const optionsPanel = document.getElementById('optionsPanel');
+    <!-- Hidden HTML5 Audio element -->
+    <audio id="audioEngine"></audio>
 
-        // Toggle options panel
-        function toggleOptions() {
-            optionsToggle.classList.toggle('active');
-            optionsPanel.classList.toggle('open');
+    <script>
+        let currentMode = 'single';
+        let fullLibraryData = [];
+        const audioEngine = document.getElementById('audioEngine');
+        let currentPlayingFilename = null;
+
+        // Close Floating Player Bar
+        function closePlayer() {
+            audioEngine.pause();
+            audioEngine.src = '';
+            document.getElementById('playerBar').classList.remove('active');
+            currentPlayingFilename = null;
         }
 
-        // Allow Enter key to trigger download
-        input.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') startDownload();
-        });
+        // Switch Tabs
+        function switchTab(tabId, element) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            element.classList.add('active');
 
-        // Icons SVG definitions
-        const icons = {
-            success: `<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
-            error: `<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
-            warning: `<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`
-        };
+            if (tabId === 'libraryTab') loadLibrary();
+            if (tabId === 'systemTab') loadSystemInfo();
+        }
 
+        // Set Single or Batch mode
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('chipSingle').classList.toggle('active', mode === 'single');
+            document.getElementById('chipBatch').classList.toggle('active', mode === 'batch');
+
+            document.getElementById('singleInputBlock').style.display = mode === 'single' ? 'block' : 'none';
+            document.getElementById('batchInputBlock').style.display = mode === 'batch' ? 'block' : 'none';
+        }
+
+        // Start Download
         async function startDownload() {
-            const query = input.value.trim();
-            if (!query) {
-                input.focus();
+            const btn = document.getElementById('downloadBtn');
+            const btnText = document.getElementById('btnText');
+            const spinner = document.getElementById('btnSpinner');
+            const statusBox = document.getElementById('statusBox');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusBody = document.getElementById('statusBody');
+            const format = document.getElementById('formatSelect').value;
+            const quality = document.getElementById('qualitySelect').value;
+
+            btn.disabled = true;
+            spinner.style.display = "block";
+            btnText.innerText = "Downloading...";
+            statusBox.className = "status-box";
+
+            try {
+                if (currentMode === 'single') {
+                    const query = document.getElementById('queryInput').value.trim();
+                    if (!query) { alert('Please enter a song name or link'); btn.disabled = false; spinner.style.display = "none"; btnText.innerText = "Download Now"; return; }
+
+                    const response = await fetch('/api/download', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ query, format, quality })
+                    });
+                    const data = await response.json();
+
+                    statusBox.classList.add('visible');
+                    if (data.status === 'success') {
+                        statusBox.classList.add('success');
+                        statusTitle.innerText = "Download Complete!";
+                        statusBody.innerHTML = `<strong>${data.title}</strong> by ${data.uploader}<br><small>Size: ${data.file_size_mb} MB | Saved to AutoDownloads</small>`;
+                        loadLibrary();
+                    } else if (data.status === 'playlist_done') {
+                        statusBox.classList.add('success');
+                        statusTitle.innerText = "Playlist Download Complete!";
+                        statusBody.innerText = `Successfully processed ${data.downloaded} / ${data.total} tracks.`;
+                        loadLibrary();
+                    } else if (data.status === 'skipped') {
+                        statusBox.classList.add('warning');
+                        statusTitle.innerText = "Skipped";
+                        statusBody.innerText = data.message || "This track is already downloaded.";
+                    } else {
+                        statusBox.classList.add('error');
+                        statusTitle.innerText = "Error Occurred";
+                        statusBody.innerText = data.error || data.message || "Download failed.";
+                    }
+
+                } else {
+                    const text = document.getElementById('batchQueryInput').value.trim();
+                    const queries = text.split('\n').filter(q => q.trim().length > 0);
+                    if (queries.length === 0) { alert('Please enter at least one song name or link'); btn.disabled = false; spinner.style.display = "none"; btnText.innerText = "Download Now"; return; }
+
+                    const response = await fetch('/api/batch_download', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ queries, format, quality })
+                    });
+                    const data = await response.json();
+
+                    statusBox.classList.add('visible', 'success');
+                    statusTitle.innerText = "Batch Processing Complete!";
+                    statusBody.innerText = `Processed ${data.results ? data.results.length : 0} download tasks. Check Library tab.`;
+                    loadLibrary();
+                }
+            } catch (err) {
+                statusBox.classList.add('visible', 'error');
+                statusTitle.innerText = "Network Error";
+                statusBody.innerText = "Could not connect to backend API server.";
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = "none";
+                btnText.innerText = "Download Now";
+            }
+        }
+
+        // Load Library
+        async function loadLibrary() {
+            try {
+                const res = await fetch('/api/library');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    fullLibraryData = data.library;
+                    renderLibrary(fullLibraryData);
+                }
+            } catch (err) {
+                console.error("Failed to load library", err);
+            }
+        }
+
+        // Render Library Items
+        function renderLibrary(items) {
+            const listEl = document.getElementById('libraryList');
+            document.getElementById('libraryCountText').innerText = `${items.length} tracks`;
+
+            if (items.length === 0) {
+                listEl.innerHTML = `<div style="text-align: center; color: #64748b; padding: 40px; font-weight: 500;">No music tracks found in AutoDownloads folder yet.</div>`;
                 return;
             }
 
-            // Set UI to loading state
-            btn.disabled = true;
-            btnText.innerText = "Downloading...";
-            spinner.style.display = "block";
-            
-            // Hide previous results
-            statusCard.className = "status-card"; // reset classes
-            statusDetails.innerHTML = '';
-            statusCard.classList.remove('visible');
+            listEl.innerHTML = items.map(item => `
+                <div class="track-item">
+                    <div class="track-meta">
+                        <button class="play-btn-circle" onclick="playTrack('${encodeURIComponent(item.filename)}', '${escapeHtml(item.title)}', '${escapeHtml(item.artist)}')">
+                            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <div class="track-details">
+                            <div class="track-title">${escapeHtml(item.title)}</div>
+                            <div class="track-artist">${escapeHtml(item.artist)} • ${item.date_added}</div>
+                        </div>
+                    </div>
+                    <div class="track-tags">
+                        <span class="tag-fmt">${item.format}</span>
+                        <span class="tag-size">${item.size_mb} MB</span>
+                        <button class="delete-btn" title="Delete file" onclick="deleteTrack('${encodeURIComponent(item.filename)}')">
+                            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-            const payload = {
-                query: query,
-                format: formatSelect.value,
-                quality: qualitySelect.value
-            };
+        function escapeHtml(str) {
+            return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
 
-            try {
-                const response = await fetch('/api/download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+        // Filter Library
+        function filterLibrary() {
+            const q = document.getElementById('librarySearch').value.toLowerCase().trim();
+            const filtered = fullLibraryData.filter(item => 
+                item.title.toLowerCase().includes(q) || item.artist.toLowerCase().includes(q) || item.filename.toLowerCase().includes(q)
+            );
+            renderLibrary(filtered);
+        }
 
-                const data = await response.json();
-                
-                // Show card
-                setTimeout(() => {
-                    statusCard.classList.add('visible');
-                    
-                    if (data.status === 'success') {
-                        statusCard.classList.add('status-success');
-                        statusTitle.innerHTML = `${icons.success} <span>Download Complete</span>`;
-                        statusMessage.innerText = `${data.title || 'Unknown Title'} by ${data.uploader || 'Unknown Artist'}`;
-                        statusDetails.innerHTML = `<span>Format: ${payload.format.toUpperCase()}</span><span>File size: ${data.file_size_mb} MB</span><span>Saved to: ${data.filepath}</span>`;
-                    } else if (data.status === 'playlist_done') {
-                        statusCard.classList.add('status-success');
-                        statusTitle.innerHTML = `${icons.success} <span>Playlist Complete</span>`;
-                        statusMessage.innerText = `Successfully downloaded ${data.downloaded} out of ${data.total} tracks concurrently.`;
-                        statusDetails.innerHTML = `<span>Format: ${payload.format.toUpperCase()}</span>`;
-                    } else if (data.status === 'skipped') {
-                        statusCard.classList.add('status-warning');
-                        statusTitle.innerHTML = `${icons.warning} <span>Skipped</span>`;
-                        statusMessage.innerText = 'This track was already downloaded previously.';
-                    } else {
-                        statusCard.classList.add('status-error');
-                        statusTitle.innerHTML = `${icons.error} <span>Error</span>`;
-                        statusMessage.innerText = data.error || data.message || 'An unknown error occurred.';
-                    }
-                }, 100);
+        // Play Track in Audio Player
+        function playTrack(encodedFilename, title, artist) {
+            const filename = decodeURIComponent(encodedFilename);
+            currentPlayingFilename = filename;
 
-            } catch (err) {
-                setTimeout(() => {
-                    statusCard.classList.add('visible', 'status-error');
-                    statusTitle.innerHTML = `${icons.error} <span>Connection Error</span>`;
-                    statusMessage.innerText = 'Failed to connect to the local API. Ensure the server is running.';
-                    console.error(err);
-                }, 100);
-            } finally {
-                // Reset UI
-                btn.disabled = false;
-                btnText.innerText = "Download Now";
-                spinner.style.display = "none";
+            document.getElementById('playerTitle').innerText = title;
+            document.getElementById('playerArtist').innerText = artist;
+            document.getElementById('playerBar').classList.add('active');
+
+            audioEngine.src = `/api/stream/${encodeURIComponent(filename)}`;
+            audioEngine.play();
+            updatePlayIcon(true);
+        }
+
+        function togglePlay() {
+            if (!audioEngine.src) return;
+            if (audioEngine.paused) {
+                audioEngine.play();
+                updatePlayIcon(true);
+            } else {
+                audioEngine.pause();
+                updatePlayIcon(false);
             }
         }
+
+        function updatePlayIcon(isPlaying) {
+            const playIconSVG = document.getElementById('playIconSVG');
+            const disc = document.getElementById('playerDisc');
+            if (isPlaying) {
+                playIconSVG.innerHTML = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
+                disc.classList.remove('paused');
+            } else {
+                playIconSVG.innerHTML = `<path d="M8 5v14l11-7z"/>`;
+                disc.classList.add('paused');
+            }
+        }
+
+        // Audio Progress Update
+        audioEngine.addEventListener('timeupdate', () => {
+            if (!audioEngine.duration) return;
+            const cur = audioEngine.currentTime;
+            const dur = audioEngine.duration;
+            const pct = (cur / dur) * 100;
+
+            document.getElementById('progressFill').style.width = `${pct}%`;
+            document.getElementById('currentTime').innerText = formatTime(cur);
+            document.getElementById('durationTime').innerText = formatTime(dur);
+        });
+
+        audioEngine.addEventListener('ended', () => {
+            updatePlayIcon(false);
+        });
+
+        function seekAudio(e) {
+            if (!audioEngine.duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pos = (e.clientX - rect.left) / rect.width;
+            audioEngine.currentTime = pos * audioEngine.duration;
+        }
+
+        function formatTime(secs) {
+            const m = Math.floor(secs / 60) || 0;
+            const s = Math.floor(secs % 60) || 0;
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        // Delete Track
+        async function deleteTrack(encodedFilename) {
+            const filename = decodeURIComponent(encodedFilename);
+            if (!confirm(`Are you sure you want to delete "${filename}"?`)) return;
+
+            try {
+                const res = await fetch('/api/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ filename })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    loadLibrary();
+                    if (currentPlayingFilename === filename) closePlayer();
+                } else {
+                    alert(data.error || 'Failed to delete file');
+                }
+            } catch (err) {
+                alert('Error deleting file');
+            }
+        }
+
+        // Open Folder
+        async function openMusicFolder() {
+            try {
+                await fetch('/api/open_folder', { method: 'POST' });
+            } catch (err) {
+                alert('Could not open folder');
+            }
+        }
+
+        // Load System Diagnostics
+        async function loadSystemInfo() {
+            try {
+                const res = await fetch('/api/system_info');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    const diag = data.diagnostics;
+                    document.getElementById('diagGrid').innerHTML = `
+                        <div class="diag-card">
+                            <div class="diag-label">Python Version</div>
+                            <div class="diag-val">${diag.python}</div>
+                            <span class="status-pill ok">Active</span>
+                        </div>
+                        <div class="diag-card">
+                            <div class="diag-label">yt-dlp Engine</div>
+                            <div class="diag-val">${diag.ytdlp}</div>
+                            <span class="status-pill ok">Active</span>
+                        </div>
+                        <div class="diag-card">
+                            <div class="diag-label">FFmpeg Audio Encoder</div>
+                            <div class="diag-val">${diag.ffmpeg}</div>
+                            <span class="status-pill ok">Active</span>
+                        </div>
+                        <div class="diag-card">
+                            <div class="diag-label">Spotify SpotDL Engine</div>
+                            <div class="diag-val">${diag.spotdl}</div>
+                            <span class="status-pill ok">Active</span>
+                        </div>
+                        <div class="diag-card">
+                            <div class="diag-label">Total Downloads</div>
+                            <div class="diag-val">${diag.total_files} Songs</div>
+                            <span class="status-pill ok">${diag.total_size_mb} MB Total</span>
+                        </div>
+                        <div class="diag-card">
+                            <div class="diag-label">Output Directory</div>
+                            <div class="diag-val" style="font-size: 0.85rem; word-break: break-all;">${diag.music_dir}</div>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error("Failed to fetch diagnostics", err);
+            }
+        }
+
+        // Initial Load
+        loadLibrary();
     </script>
 </body>
 </html>
