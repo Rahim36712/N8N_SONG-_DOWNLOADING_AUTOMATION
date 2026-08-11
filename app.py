@@ -8,9 +8,14 @@ app = Flask(__name__)
 
 @app.after_request
 def add_header(response):
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    if request.endpoint == 'api_stream' or (request.path and request.path.startswith('/api/stream/')):
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        response.headers.pop('Pragma', None)
+        response.headers.pop('Expires', None)
+    else:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
     return response
 
 @app.route("/")
@@ -136,7 +141,60 @@ def api_preview():
     preview = download_song.get_track_preview(query)
     return jsonify(preview)
 
+@app.route("/api/lyrics", methods=["GET"])
+def api_get_lyrics():
+    filename = request.args.get("filename") or request.args.get("query")
+    if not filename:
+        return jsonify({"status": "error", "error": "Filename or query parameter required"}), 400
+
+    safe_filename = os.path.basename(filename)
+    sidecar_content = download_song.get_sidecar_lyrics(safe_filename)
+
+    if sidecar_content is not None:
+        synced = download_song.is_lrc_synced(sidecar_content)
+        return jsonify({
+            "status": "success",
+            "synced": synced,
+            "lyrics": sidecar_content
+        })
+
+    # Fetch via cascade if missing
+    result = download_song.fetch_lyrics_multi_provider(safe_filename)
+    lyrics = result.get("lyrics") if isinstance(result, dict) else result
+    synced = result.get("synced", download_song.is_lrc_synced(lyrics)) if isinstance(result, dict) else download_song.is_lrc_synced(lyrics)
+
+    if lyrics:
+        download_song.save_sidecar_lyrics(safe_filename, lyrics)
+
+    return jsonify({
+        "status": "success",
+        "synced": synced,
+        "lyrics": lyrics
+    })
+
+
+@app.route("/api/lyrics/save", methods=["POST"])
+def api_save_lyrics():
+    data = request.get_json() or {}
+    filename = data.get("filename")
+    lyrics = data.get("lyrics")
+
+    if not filename or lyrics is None:
+        return jsonify({"status": "error", "error": "Filename and lyrics required"}), 400
+
+    safe_filename = os.path.basename(filename)
+    download_song.save_sidecar_lyrics(safe_filename, lyrics)
+    synced = download_song.is_lrc_synced(lyrics)
+
+    return jsonify({
+        "status": "success",
+        "synced": synced,
+        "message": "Lyrics saved successfully"
+    })
+
+
 if __name__ == "__main__":
     print("Starting Auto Downloader Server on http://127.0.0.1:5000")
     app.run(host="127.0.0.1", port=5000, debug=False)
+
 

@@ -13,17 +13,192 @@ import csv
 import tempfile
 import traceback
 import uuid
+import re
 import concurrent.futures
 from datetime import datetime
 
 
 def get_dirs():
     home = os.path.expanduser("~")
+    lyrics_dir = os.path.join(home, "Music", "AutoDownloads", ".lyrics")
+    os.makedirs(lyrics_dir, exist_ok=True)
     return {
         "music": os.path.join(home, "Music", "AutoDownloads"),
         "archive": os.path.join(home, "Music", ".downloaded.txt"),
         "log": os.path.join(home, "Music", "download_log.csv"),
+        "lyrics": lyrics_dir,
     }
+
+
+def is_lrc_synced(text):
+    if not text:
+        return False
+    return bool(re.search(r"\[\d{1,2}:\d{2}", str(text)))
+
+
+def save_sidecar_lyrics(filename, lyrics_text):
+    """Save sidecar lyrics file with UTF-8 encoding into .lyrics/ directory."""
+    if not filename or lyrics_text is None:
+        return None
+    safe_filename = os.path.basename(filename)
+    stem = os.path.splitext(safe_filename)[0]
+    dirs = get_dirs()
+    lyrics_dir = dirs["lyrics"]
+    os.makedirs(lyrics_dir, exist_ok=True)
+    filepath = os.path.join(lyrics_dir, f"{stem}.lrc")
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(lyrics_text)
+    return filepath
+
+
+def get_sidecar_lyrics(filename):
+    """Retrieve sidecar lyrics from .lyrics/<stem>.lrc or .lyrics/<stem>.txt with UTF-8 encoding."""
+    if not filename:
+        return None
+    safe_filename = os.path.basename(filename)
+    stem = os.path.splitext(safe_filename)[0]
+    dirs = get_dirs()
+    lyrics_dir = dirs["lyrics"]
+
+    lrc_path = os.path.join(lyrics_dir, f"{stem}.lrc")
+    txt_path = os.path.join(lyrics_dir, f"{stem}.txt")
+
+    if os.path.exists(lrc_path):
+        with open(lrc_path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    elif os.path.exists(txt_path):
+        with open(txt_path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    return None
+
+
+def _clean_search_query(raw):
+    """Strip YouTube/Spotify metadata junk from filenames for lyrics search.
+    e.g. 'Abdul_Hannan_-_Haaray_Prod_by_Shahmeer_Raza_Khan_Official_Music_Video'
+    becomes 'Abdul Hannan Haaray'
+    """
+    if not raw:
+        return ""
+    s = raw.replace("_", " ")
+    # Remove bracketed/parenthesized content: [Official Video], (Prod. by X), etc.
+    s = re.sub(r"[\[\(][^\]\)]*[\]\)]", " ", s)
+    # Remove common YouTube/Spotify metadata keywords (case-insensitive)
+    noise_words = [
+        r"\bOfficial\b", r"\bMusic\s*Video\b", r"\bVideo\b", r"\bAudio\b",
+        r"\bLyric\s*Video\b", r"\bLyrics?\b", r"\bVisuali[sz]er\b",
+        r"\bProd\.?\s*(by)?\b", r"\bft\.?\b", r"\bfeat\.?\b",
+        r"\bOfficial\s*Audio\b", r"\bOfficial\s*Video\b",
+    ]
+    for nw in noise_words:
+        s = re.sub(nw, " ", s, flags=re.IGNORECASE)
+    # Collapse multiple dashes/spaces
+    s = re.sub(r"\s*-\s*-+\s*", " ", s)
+    s = re.sub(r"\s{2,}", " ", s).strip()
+    # Remove trailing dash artifacts
+    s = re.sub(r"\s*-\s*$", "", s).strip()
+    s = re.sub(r"^\s*-\s*", "", s).strip()
+    return s
+
+
+def fetch_lyrics_multi_provider(query, title=None, artist=None):
+    """4-stage cascade lyrics fetcher:
+    Stage 1: syncedlyrics.search
+    Stage 2: LRCLIB /api/get
+    Stage 3: LRCLIB /api/search
+    Stage 4: Plain text fallback -> null/empty
+    """
+    clean_query = os.path.splitext(os.path.basename(query))[0] if query else ""
+
+    if not title and not artist and " - " in clean_query:
+        parts = clean_query.split(" - ", 1)
+        artist = _clean_search_query(parts[0])
+        title = _clean_search_query(parts[1])
+    elif not title and not artist:
+        # Try splitting on " - " inside underscored names too
+        normalized = clean_query.replace("_-_", " - ").replace("_", " ")
+        if " - " in normalized:
+            parts = normalized.split(" - ", 1)
+            artist = _clean_search_query(parts[0])
+            title = _clean_search_query(parts[1])
+
+    if title:
+        title = _clean_search_query(title)
+    if artist:
+        artist = _clean_search_query(artist)
+
+    if not title:
+        title = _clean_search_query(clean_query)
+
+    search_term = f"{artist} {title}".strip() if artist and title else _clean_search_query(clean_query)
+
+    plain_candidate = None
+
+    # Stage 1: syncedlyrics search
+    try:
+        import syncedlyrics
+        sl_res = syncedlyrics.search(search_term)
+        if sl_res and sl_res.strip():
+            if is_lrc_synced(sl_res):
+                return {"lyrics": sl_res, "synced": True}
+            else:
+                plain_candidate = sl_res
+    except Exception:
+        pass
+
+    # Stage 2: LRCLIB /api/get
+    if title:
+        try:
+            import requests
+            params = {"track_name": title}
+            if artist:
+                params["artist_name"] = artist
+            r = requests.get("https://lrclib.net/api/get", params=params, timeout=5, headers={"User-Agent": "AutoSongDownloader/1.0"})
+            if r.status_code == 200:
+                data = r.json()
+                synced = data.get("syncedLyrics")
+                plain = data.get("plainLyrics")
+                if synced and is_lrc_synced(synced):
+                    return {"lyrics": synced, "synced": True}
+                if plain and not plain_candidate:
+                    plain_candidate = plain
+        except Exception:
+            pass
+
+    # Stage 3: LRCLIB /api/search
+    try:
+        import requests
+        params = {"q": search_term}
+        r = requests.get("https://lrclib.net/api/search", params=params, timeout=5, headers={"User-Agent": "AutoSongDownloader/1.0"})
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list):
+                for item in data:
+                    synced = item.get("syncedLyrics")
+                    if synced and is_lrc_synced(synced):
+                        return {"lyrics": synced, "synced": True}
+                    if not plain_candidate and item.get("plainLyrics"):
+                        plain_candidate = item.get("plainLyrics")
+    except Exception:
+        pass
+
+    # Stage 4: Plain text fallback -> null/empty
+    if plain_candidate and plain_candidate.strip():
+        return {"lyrics": plain_candidate, "synced": False}
+
+    return {"lyrics": None, "synced": False}
+
+
+def auto_fetch_and_save_lyrics(filename, title=None, uploader=None):
+    """Auto-fetch and save lyrics sidecar for a downloaded track."""
+    try:
+        res = fetch_lyrics_multi_provider(filename, title=title, artist=uploader)
+        lyrics = res.get("lyrics") if isinstance(res, dict) else res
+        if lyrics:
+            save_sidecar_lyrics(filename, lyrics)
+            return True
+    except Exception as e:
+        print(f"Error auto-fetching lyrics for {filename}: {e}", file=sys.stderr)
+    return False
 
 
 def is_yt_playlist(q):
@@ -118,10 +293,15 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
             }
 
         fsize = os.path.getsize(fpath) if os.path.exists(fpath) else 0
+        fname = os.path.basename(fpath)
+        try:
+            auto_fetch_and_save_lyrics(fname, title=title, uploader=uploader)
+        except Exception:
+            pass
         return {
-            "status": "success", "query": query, "title": title or os.path.basename(fpath),
+            "status": "success", "query": query, "title": title or fname,
             "uploader": uploader or "Unknown", "url": url, "filepath": fpath,
-            "filename": os.path.basename(fpath),
+            "filename": fname,
             "file_size_mb": round(fsize / 1024 / 1024, 2), "timestamp": now
         }
     else:
@@ -269,6 +449,11 @@ def get_music_library(dirs):
                     artist = "Unknown"
                     title = raw_name
 
+                lyrics_dir = dirs.get("lyrics") or os.path.join(dirs["music"], ".lyrics")
+                lrc_path = os.path.join(lyrics_dir, f"{raw_name}.lrc")
+                txt_path = os.path.join(lyrics_dir, f"{raw_name}.txt")
+                has_lyrics = os.path.exists(lrc_path) or os.path.exists(txt_path)
+
                 library.append({
                     "filename": filename,
                     "filepath": full_path,
@@ -276,7 +461,8 @@ def get_music_library(dirs):
                     "artist": artist,
                     "format": ext.replace(".", "").upper(),
                     "size_mb": size_mb,
-                    "date_added": mtime
+                    "date_added": mtime,
+                    "has_lyrics": has_lyrics
                 })
             except Exception:
                 continue

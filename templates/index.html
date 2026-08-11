@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Song Downloader & Music Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             /* Cool Yellow & Off-White Palette */
@@ -858,6 +862,576 @@
         .status-pill.ok { background: rgba(16, 185, 129, 0.15) !important; color: #047857 !important; }
         .status-pill.missing { background: rgba(239, 68, 68, 0.15) !important; color: #b91c1c !important; }
 
+        /* ==========================================================================
+           Synchronized Karaoke Lyrics & Multi-Language / Urdu RTL Styling
+           ========================================================================== */
+        
+        .lyric-line {
+            display: block;
+            width: 100%;
+            padding: 8px 16px;
+            margin: 4px 0;
+            border-radius: 12px;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0.35;
+            color: #94a3b8;
+            cursor: pointer;
+            user-select: none;
+            word-break: break-word;
+            text-align: center;
+        }
+
+        .lyric-line:hover {
+            opacity: 0.75;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .lyric-line.active {
+            opacity: 1 !important;
+            color: #facc15 !important;
+            text-shadow: 0 0 15px rgba(250, 204, 21, 0.75), 0 0 30px rgba(245, 158, 11, 0.4);
+            font-weight: 800;
+            transform: scale(1.08);
+            filter: none !important;
+        }
+
+        .lyric-line.passed {
+            opacity: 0.5;
+            color: #cbd5e1;
+        }
+
+        .lyric-line[dir="ltr"], .lyric-line.script-ltr {
+            direction: ltr;
+        }
+
+        .lyric-line[dir="rtl"], .lyric-line.script-rtl {
+            direction: rtl;
+            font-family: 'Noto Nastaliq Urdu', 'Urdu Typesetting', serif;
+            line-height: 2.3;
+            letter-spacing: 0 !important;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+
+        /* Player Bar Actions */
+        .player-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .player-lyrics-btn {
+            background: #f4f2ea !important;
+            border: 1px solid #e2e8f0 !important;
+            height: 36px;
+            padding: 0 14px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: #0f172a !important;
+            font-weight: 700;
+            font-size: 0.82rem;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .player-lyrics-btn:hover, .player-lyrics-btn.active {
+            background: #facc15 !important;
+            border-color: #eab308 !important;
+            color: #0f172a !important;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(250, 204, 21, 0.4);
+        }
+
+        .player-lyrics-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* ==========================================================================
+           Full-Screen Karaoke Overlay View (#fullScreenLyricsOverlay)
+           ========================================================================== */
+        #fullScreenLyricsOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: #0b0f19;
+            color: #ffffff;
+            overflow: hidden;
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            opacity: 0;
+            transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #fullScreenLyricsOverlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        /* Ambient Glowing Background Blobs Mesh */
+        .fs-backdrop-mesh {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .fs-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.85;
+        }
+
+        .fs-blob.blob-1 {
+            top: -20%;
+            left: -10%;
+            width: 65vw;
+            height: 65vw;
+            background: radial-gradient(circle, rgba(250, 204, 21, 0.15) 0%, transparent 70%);
+            animation: fsBlobPulse1 14s infinite alternate ease-in-out;
+        }
+
+        .fs-blob.blob-2 {
+            bottom: -20%;
+            right: -10%;
+            width: 65vw;
+            height: 65vw;
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, transparent 70%);
+            animation: fsBlobPulse2 18s infinite alternate-reverse ease-in-out;
+        }
+
+        .fs-blob.blob-3 {
+            top: 35%;
+            left: 35%;
+            width: 45vw;
+            height: 45vw;
+            background: radial-gradient(circle, rgba(250, 204, 21, 0.08) 0%, transparent 70%);
+            animation: fsBlobPulse3 12s infinite alternate ease-in-out;
+        }
+
+        @keyframes fsBlobPulse1 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(50px, 40px) scale(1.15); }
+            100% { transform: translate(-30px, 60px) scale(0.95); }
+        }
+
+        @keyframes fsBlobPulse2 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-50px, -40px) scale(1.1); }
+            100% { transform: translate(40px, -50px) scale(1); }
+        }
+
+        @keyframes fsBlobPulse3 {
+            0% { transform: translate(0, 0) scale(0.9); }
+            100% { transform: translate(30px, 30px) scale(1.2); }
+        }
+
+        /* Overlay Top Header */
+        .fs-header {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 36px;
+            background: linear-gradient(180deg, rgba(11, 15, 25, 0.8) 0%, rgba(11, 15, 25, 0) 100%);
+            width: 100%;
+        }
+
+        .fs-track-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .fs-cover-art {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 20px rgba(250, 204, 21, 0.3);
+            flex-shrink: 0;
+        }
+
+        .fs-cover-art svg {
+            width: 26px;
+            height: 26px;
+            fill: #0f172a;
+        }
+
+        .fs-meta {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fs-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.2;
+        }
+
+        .fs-artist {
+            font-size: 0.95rem;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .fs-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(250, 204, 21, 0.15);
+            color: #facc15;
+            border: 1px solid rgba(250, 204, 21, 0.3);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        .fs-header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .fs-close-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            padding: 8px 14px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .fs-close-btn:hover {
+            background: rgba(239, 68, 68, 0.8);
+            border-color: #ef4444;
+            transform: scale(1.05);
+        }
+
+        .fs-close-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .fs-esc-hint {
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Center Stage Container */
+        .fs-stage-wrapper {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            overflow: hidden;
+            padding: 10px 30px;
+        }
+
+        .fs-karaoke-stage {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 25vh 0;
+            gap: 28px;
+            mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,1) 15%, rgba(0,0,0,1) 85%, transparent 100%);
+            -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,1) 15%, rgba(0,0,0,1) 85%, transparent 100%);
+        }
+
+        #fullScreenLyricsOverlay .lyric-line {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #94a3b8;
+            opacity: 0.35;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: scale(0.95);
+            line-height: 1.5;
+            padding: 6px 16px;
+            border-radius: 12px;
+            user-select: none;
+        }
+
+        #fullScreenLyricsOverlay .lyric-line:hover {
+            opacity: 0.75;
+            color: #e2e8f0;
+        }
+
+        #fullScreenLyricsOverlay .lyric-line.active {
+            font-size: 2.4rem;
+            font-weight: 900;
+            color: #facc15 !important;
+            opacity: 1 !important;
+            transform: scale(1.06);
+            text-shadow: 0 0 15px rgba(250, 204, 21, 0.75), 0 0 30px rgba(245, 158, 11, 0.4);
+        }
+
+        #fullScreenLyricsOverlay .lyric-line[dir="rtl"], #fullScreenLyricsOverlay .lyric-line.script-rtl {
+            direction: rtl;
+            font-family: 'Noto Nastaliq Urdu', serif;
+            font-size: 2.2rem;
+            line-height: 2.3;
+        }
+
+        #fullScreenLyricsOverlay .lyric-line[dir="rtl"].active {
+            font-size: 2.6rem;
+            line-height: 2.3;
+        }
+
+        /* Floating Re-center Pill Button */
+        .recenter-pill-btn, .fs-recenter-btn {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(250, 204, 21, 0.5);
+            color: #facc15;
+            padding: 8px 18px;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 12px rgba(250, 204, 21, 0.3);
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+        }
+
+        .recenter-pill-btn:hover, .fs-recenter-btn:hover {
+            transform: translateX(-50%) scale(1.05);
+            background: rgba(250, 204, 21, 0.15);
+            color: #ffffff;
+        }
+
+        /* Bottom Transport Bar */
+        .fs-transport-bar {
+            position: relative;
+            z-index: 10;
+            width: calc(100% - 60px);
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            padding: 20px 30px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 28px;
+            backdrop-filter: blur(15px);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .fs-progress-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+        }
+
+        .fs-time-str {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #94a3b8;
+            font-family: 'JetBrains Mono', monospace;
+            width: 44px;
+        }
+
+        .fs-progress-bar-bg {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .fs-progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #facc15 0%, #f59e0b 100%);
+            border-radius: 10px;
+            transition: width 0.1s linear;
+        }
+
+        .fs-controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+        }
+
+        .fs-play-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #facc15 !important;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(250, 204, 21, 0.4);
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        .fs-play-btn:hover {
+            transform: scale(1.1);
+            background: #eab308 !important;
+        }
+
+        .fs-play-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: #0f172a;
+        }
+
+        .fs-action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .fs-action-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            transform: scale(1.05);
+        }
+
+        /* Volume Controls Styling */
+        .player-volume-group, .fs-volume-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .player-mute-btn {
+            background: #f4f2ea !important;
+            border: 1px solid #e2e8f0 !important;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #0f172a !important;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .player-mute-btn:hover {
+            background: #facc15 !important;
+            border-color: #eab308 !important;
+            transform: scale(1.08);
+        }
+
+        .player-mute-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .volume-slider, .fs-volume-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 90px;
+            height: 6px;
+            background: #f4f2ea !important;
+            border-radius: 10px;
+            outline: none;
+            cursor: pointer;
+            transition: background 0.2s ease, opacity 0.2s ease;
+        }
+
+        .fs-volume-slider {
+            background: rgba(255, 255, 255, 0.2) !important;
+            width: 110px;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ca8a04 !important;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .fs-volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #facc15 !important;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover, .fs-volume-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+        }
+
+        .volume-slider::-moz-range-thumb, .fs-volume-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: none;
+            background: #ca8a04 !important;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
     </style>
 </head>
 <body>
@@ -1029,10 +1603,83 @@
             </div>
         </div>
 
-        <!-- Close Player Button -->
-        <button class="player-close-btn" onclick="closePlayer()" title="Close Player & Stop Audio">
-            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
+        <div class="player-actions">
+            <button class="player-lyrics-btn" id="playerLyricsBtn" onclick="toggleFullScreenLyrics()" title="Toggle Full-Screen Karaoke View (Esc)">
+                <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                <span>Lyrics</span>
+            </button>
+            <div class="player-volume-group">
+                <button class="player-mute-btn mute-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute"><i class="fas fa-volume-up"></i></button>
+                <input type="range" class="volume-slider" id="volumeControl" min="0" max="1" step="0.01" value="1" oninput="setVolume(this.value)" title="Volume Control">
+            </div>
+            <!-- Close Player Button -->
+            <button class="player-close-btn" id="closePlayerBtn" onclick="closePlayer()" title="Close Player & Stop Audio">
+                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Full-Screen Karaoke Overlay Container -->
+    <div id="fullScreenLyricsOverlay">
+        <!-- Ambient Backdrop Glow Mesh -->
+        <div class="fs-backdrop-mesh">
+            <div class="fs-blob blob-1"></div>
+            <div class="fs-blob blob-2"></div>
+            <div class="fs-blob blob-3"></div>
+        </div>
+
+        <!-- Top Header -->
+        <div class="fs-header">
+            <div class="fs-track-info">
+                <div class="fs-cover-art" id="fsCoverArt">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/></svg>
+                </div>
+                <div class="fs-meta">
+                    <h2 class="fs-title" id="fsTrackTitle">Select a track</h2>
+                    <p class="fs-artist" id="fsTrackArtist">Auto Downloader Pro</p>
+                </div>
+                <span class="fs-badge" id="fsLrcBadge">SYNCED LRC</span>
+            </div>
+            <div class="fs-header-controls">
+                <button class="fs-close-btn" onclick="toggleFullScreenLyrics()" title="Close Full-Screen View (Esc)">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    <span class="fs-esc-hint">ESC</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Karaoke Stage -->
+        <div class="fs-stage-wrapper">
+            <button class="fs-recenter-btn" id="fsRecenterBtn" onclick="recenterActiveLyricLine()">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                Re-center Lyrics
+            </button>
+
+            <div class="fs-karaoke-stage" id="fullScreenLyricsContent">
+                <div class="lyrics-placeholder" style="color: #94a3b8; font-size: 1.2rem;">Select a track to start Synchronized Karaoke View</div>
+            </div>
+        </div>
+
+        <!-- Bottom Transport Bar -->
+        <div class="fs-transport-bar">
+            <div class="fs-progress-wrapper">
+                <span class="fs-time-str" id="fsCurrentTime">0:00</span>
+                <div class="fs-progress-bar-bg" onclick="seekAudioFS(event)">
+                    <div class="fs-progress-bar-fill" id="fsProgressFill"></div>
+                </div>
+                <span class="fs-time-str" id="fsDurationTime">0:00</span>
+            </div>
+
+            <div class="fs-controls-row">
+                <button class="fs-play-btn" id="fsPlayBtn" onclick="togglePlay()">
+                    <svg id="fsPlayIconSVG" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <div class="fs-volume-group">
+                    <button class="fs-action-btn fs-mute-btn mute-btn" id="overlayMuteBtn" onclick="toggleMute()" title="Mute/Unmute"><svg id="overlayMuteIconSVG" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.74 2.5-2.26 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+                    <input type="range" class="fs-volume-slider" id="overlayVolumeControl" min="0" max="1" step="0.01" value="1" oninput="setVolume(this.value)" title="Volume Control">
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Hidden HTML5 Audio element -->
@@ -1044,12 +1691,333 @@
         const audioEngine = document.getElementById('audioEngine');
         let currentPlayingFilename = null;
 
-        // Close Floating Player Bar
+        // --- Synced Lyrics & Full-Screen State ---
+        let parsedLyrics = [];
+        let currentActiveLyricIndex = -1;
+        let isManualScroll = false;
+        let manualScrollTimeout = null;
+        let isProgrammaticScroll = false;
+        let isFullScreenLyricsOpen = false;
+
+        const URDU_ARABIC_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+        // Script & Language Detection (Urdu RTL vs LTR)
+        function detectLanguageScript(text) {
+            if (!text || typeof text !== 'string') return 'ltr';
+            const cleanText = text.replace(/^\[\d{2}:\d{2}\.\d{2,3}\]\s*/, '').trim();
+            return URDU_ARABIC_REGEX.test(cleanText) ? 'rtl' : 'ltr';
+        }
+
+        // Synchronized LRC Parser
+        function parseLRC(lrcText) {
+            if (!lrcText || typeof lrcText !== 'string') return [];
+            const lines = lrcText.split(/\r?\n/);
+            const result = [];
+            const timestampRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/g;
+
+            for (const rawLine of lines) {
+                const line = rawLine.trim();
+                if (!line || /^\[[a-z]+:/i.test(line)) continue; // Skip metadata tags like [ti:], [ar:]
+
+                const matches = [...line.matchAll(timestampRegex)];
+                if (matches.length > 0) {
+                    const lyricText = line.replace(timestampRegex, '').trim();
+                    const scriptDir = detectLanguageScript(lyricText);
+
+                    for (const match of matches) {
+                        const min = parseInt(match[1], 10);
+                        const sec = parseInt(match[2], 10);
+                        const subSecStr = match[3];
+                        const subSec = parseInt(subSecStr, 10);
+                        const subSecSeconds = subSecStr.length === 3 ? subSec / 1000 : subSec / 100;
+                        const totalSeconds = min * 60 + sec + subSecSeconds;
+
+                        result.push({
+                            time: totalSeconds,
+                            text: lyricText,
+                            dir: scriptDir,
+                            isUrdu: scriptDir === 'rtl'
+                        });
+                    }
+                }
+            }
+
+            result.sort((a, b) => a.time - b.time);
+            return result;
+        }
+
+        // Binary Search Active Line Finder
+        function findActiveLineIndex(lyrics, currentTime) {
+            if (!lyrics || lyrics.length === 0) return -1;
+            if (currentTime < lyrics[0].time) return -1;
+
+            let low = 0;
+            let high = lyrics.length - 1;
+            let ans = -1;
+
+            while (low <= high) {
+                const mid = Math.floor((low + high) / 2);
+                if (lyrics[mid].time <= currentTime) {
+                    ans = mid;
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            return ans;
+        }
+
+        // Fetch and Display Lyrics
+        async function fetchAndDisplayLyrics(filename) {
+            if (!filename) return;
+            try {
+                const res = await fetch(`/api/lyrics?filename=${encodeURIComponent(filename)}`);
+                const data = await res.json();
+                if (data.status === 'success' && data.lyrics) {
+                    if (data.synced) {
+                        parsedLyrics = parseLRC(data.lyrics);
+                        renderSyncedLyrics(parsedLyrics);
+                    } else {
+                        parsedLyrics = [];
+                        renderPlainLyrics(data.lyrics);
+                    }
+                } else {
+                    parsedLyrics = [];
+                    renderNoLyricsAvailable();
+                }
+            } catch (err) {
+                console.error("Error fetching lyrics:", err);
+                parsedLyrics = [];
+                renderNoLyricsAvailable();
+            }
+        }
+
+        function fetchLyrics(filename) {
+            return fetchAndDisplayLyrics(filename);
+        }
+
+        function renderSyncedLyrics(lyrics) {
+            currentActiveLyricIndex = -1;
+            isManualScroll = false;
+            showRecenterPill(false);
+
+            const stage = document.getElementById('fullScreenLyricsContent');
+            if (!stage) return;
+
+            if (!lyrics || lyrics.length === 0) {
+                stage.innerHTML = `<div class="lyrics-placeholder" style="color: #94a3b8; font-size: 1.2rem;">No synchronized lyrics available</div>`;
+                return;
+            }
+
+            stage.innerHTML = lyrics.map((line, idx) => `
+                <div class="lyric-line ${line.isUrdu ? 'script-rtl' : 'script-ltr'}"
+                     id="fs-lyric-line-${idx}"
+                     data-index="${idx}"
+                     data-time="${line.time}"
+                     dir="${line.dir}"
+                     onclick="seekToLyricTime(${line.time})">
+                    ${escapeHtml(line.text || '♪')}
+                </div>
+            `).join('');
+        }
+
+        function renderPlainLyrics(plainText) {
+            const stage = document.getElementById('fullScreenLyricsContent');
+            if (!stage) return;
+            const lines = plainText.split(/\r?\n/);
+            stage.innerHTML = lines.map(line => {
+                const dir = detectLanguageScript(line);
+                return `<div class="lyric-line ${dir === 'rtl' ? 'script-rtl' : 'script-ltr'}" dir="${dir}">${escapeHtml(line)}</div>`;
+            }).join('');
+        }
+
+        function renderNoLyricsAvailable() {
+            const stage = document.getElementById('fullScreenLyricsContent');
+            if (!stage) return;
+            stage.innerHTML = `<div class="lyrics-placeholder" style="color: #94a3b8; font-size: 1.2rem;">No lyrics found for this track</div>`;
+        }
+
+        // Active Line Highlight & Auto-Scroll
+        function updateActiveLyricLine(newIndex) {
+            currentActiveLyricIndex = newIndex;
+
+            const stage = document.getElementById('fullScreenLyricsContent');
+            if (!stage) return;
+
+            const lines = stage.querySelectorAll('.lyric-line');
+            lines.forEach((lineEl, idx) => {
+                if (idx === newIndex) {
+                    lineEl.classList.add('active');
+                    lineEl.classList.remove('passed');
+                } else if (idx < newIndex) {
+                    lineEl.classList.remove('active');
+                    lineEl.classList.add('passed');
+                } else {
+                    lineEl.classList.remove('active', 'passed');
+                }
+            });
+
+            if (newIndex >= 0 && lines[newIndex]) {
+                autoScrollContainerToLine(stage, lines[newIndex]);
+            }
+        }
+
+        function autoScrollContainerToLine(container, lineEl) {
+            if (isManualScroll || !lineEl || !container) return;
+
+            const targetTop = lineEl.offsetTop - (container.clientHeight / 2) + (lineEl.clientHeight / 2);
+
+            isProgrammaticScroll = true;
+            container.scrollTo({
+                top: Math.max(0, targetTop),
+                behavior: 'smooth'
+            });
+
+            setTimeout(() => {
+                isProgrammaticScroll = false;
+            }, 450);
+        }
+
+        function setupManualScrollListeners() {
+            const container = document.getElementById('fullScreenLyricsContent');
+            if (!container) return;
+
+            const handleUserScroll = () => {
+                if (isProgrammaticScroll) return;
+
+                isManualScroll = true;
+                showRecenterPill(true);
+
+                if (manualScrollTimeout) clearTimeout(manualScrollTimeout);
+                manualScrollTimeout = setTimeout(() => {
+                    isManualScroll = false;
+                    showRecenterPill(false);
+                    recenterActiveLyricLine();
+                }, 5000);
+            };
+
+            container.addEventListener('wheel', handleUserScroll, { passive: true });
+            container.addEventListener('touchmove', handleUserScroll, { passive: true });
+        }
+
+        function recenterActiveLyricLine() {
+            isManualScroll = false;
+            showRecenterPill(false);
+            if (currentActiveLyricIndex >= 0) {
+                const container = document.getElementById('fullScreenLyricsContent');
+                if (!container) return;
+                const activeLine = container.querySelector(`.lyric-line[data-index="${currentActiveLyricIndex}"]`);
+                if (activeLine) {
+                    autoScrollContainerToLine(container, activeLine);
+                }
+            }
+        }
+
+        function showRecenterPill(visible) {
+            const pill = document.getElementById('fsRecenterBtn');
+            if (pill) {
+                pill.style.display = visible ? 'flex' : 'none';
+            }
+        }
+
+        // Click-to-Seek Lyric Line
+        function seekToLyricTime(lineTime) {
+            if (!audioEngine.src) return;
+            audioEngine.currentTime = lineTime;
+            if (audioEngine.paused) {
+                audioEngine.play();
+                updatePlayIcon(true);
+            }
+
+            const newIdx = findActiveLineIndex(parsedLyrics, lineTime);
+            updateActiveLyricLine(newIdx);
+            recenterActiveLyricLine();
+        }
+
+        // Full-Screen Karaoke Overlay Toggling
+        function toggleFullScreenLyrics() {
+            const overlay = document.getElementById('fullScreenLyricsOverlay');
+            const lyricsBtn = document.getElementById('playerLyricsBtn');
+            if (!overlay) return;
+
+            isFullScreenLyricsOpen = !isFullScreenLyricsOpen;
+            if (isFullScreenLyricsOpen) {
+                overlay.classList.add('active');
+                if (lyricsBtn) lyricsBtn.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                syncFullScreenMetadata();
+                recenterActiveLyricLine();
+            } else {
+                closeFullScreenLyrics();
+            }
+        }
+
+        function closeFullScreenLyrics() {
+            const overlay = document.getElementById('fullScreenLyricsOverlay');
+            const lyricsBtn = document.getElementById('playerLyricsBtn');
+            if (!overlay) return;
+
+            isFullScreenLyricsOpen = false;
+            overlay.classList.remove('active');
+            if (lyricsBtn) lyricsBtn.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function syncFullScreenMetadata() {
+            const title = document.getElementById('playerTitle') ? document.getElementById('playerTitle').textContent : '';
+            const artist = document.getElementById('playerArtist') ? document.getElementById('playerArtist').textContent : '';
+            if (document.getElementById('fsTrackTitle')) document.getElementById('fsTrackTitle').textContent = title;
+            if (document.getElementById('fsTrackArtist')) document.getElementById('fsTrackArtist').textContent = artist;
+            syncFullScreenTime();
+        }
+
+        function syncFullScreenTime() {
+            if (!audioEngine) return;
+            const cur = audioEngine.currentTime || 0;
+            const dur = audioEngine.duration || 0;
+
+            if (document.getElementById('fsCurrentTime')) document.getElementById('fsCurrentTime').textContent = formatTime(cur);
+            if (document.getElementById('fsDurationTime')) document.getElementById('fsDurationTime').textContent = formatTime(dur);
+
+            const pct = dur > 0 ? (cur / dur) * 100 : 0;
+            if (document.getElementById('fsProgressFill')) document.getElementById('fsProgressFill').style.width = pct + '%';
+
+            const playIconSVG = document.getElementById('fsPlayIconSVG');
+            if (playIconSVG) {
+                if (audioEngine.paused) {
+                    playIconSVG.innerHTML = '<path d="M8 5v14l11-7z"/>';
+                } else {
+                    playIconSVG.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+                }
+            }
+        }
+
+        function seekAudioFS(e) {
+            if (!audioEngine || !audioEngine.duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const width = rect.width;
+            const newTime = (clickX / width) * audioEngine.duration;
+            audioEngine.currentTime = newTime;
+            syncFullScreenTime();
+        }
+
+        // Close Floating Player Bar & Overlay
         function closePlayer() {
             audioEngine.pause();
+            audioEngine.currentTime = 0;
             audioEngine.src = '';
-            document.getElementById('playerBar').classList.remove('active');
+            const playerBar = document.getElementById('playerBar');
+            if (playerBar) playerBar.classList.remove('active');
             currentPlayingFilename = null;
+            updatePlayIcon(false);
+            if (document.getElementById('progressFill')) document.getElementById('progressFill').style.width = '0%';
+            if (document.getElementById('fsProgressFill')) document.getElementById('fsProgressFill').style.width = '0%';
+            if (document.getElementById('currentTime')) document.getElementById('currentTime').innerText = '0:00';
+            if (document.getElementById('durationTime')) document.getElementById('durationTime').innerText = '0:00';
+            if (document.getElementById('fsCurrentTime')) document.getElementById('fsCurrentTime').innerText = '0:00';
+            if (document.getElementById('fsDurationTime')) document.getElementById('fsDurationTime').innerText = '0:00';
+            closeFullScreenLyrics();
         }
 
         // Switch Tabs
@@ -1187,6 +2155,7 @@
                         </div>
                     </div>
                     <div class="track-tags">
+                        ${item.has_lyrics ? '<span class="tag-fmt" style="background:rgba(250,204,21,0.15);color:#ca8a04;border-color:rgba(250,204,21,0.3);">♫ LYRICS</span>' : ''}
                         <span class="tag-fmt">${item.format}</span>
                         <span class="tag-size">${item.size_mb} MB</span>
                         <button class="delete-btn" title="Delete file" onclick="deleteTrack('${encodeURIComponent(item.filename)}')">
@@ -1222,6 +2191,9 @@
             audioEngine.src = `/api/stream/${encodeURIComponent(filename)}`;
             audioEngine.play();
             updatePlayIcon(true);
+
+            syncFullScreenMetadata();
+            fetchAndDisplayLyrics(filename);
         }
 
         function togglePlay() {
@@ -1237,17 +2209,20 @@
 
         function updatePlayIcon(isPlaying) {
             const playIconSVG = document.getElementById('playIconSVG');
+            const fsPlayIconSVG = document.getElementById('fsPlayIconSVG');
             const disc = document.getElementById('playerDisc');
             if (isPlaying) {
-                playIconSVG.innerHTML = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
-                disc.classList.remove('paused');
+                if (playIconSVG) playIconSVG.innerHTML = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
+                if (fsPlayIconSVG) fsPlayIconSVG.innerHTML = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
+                if (disc) disc.classList.remove('paused');
             } else {
-                playIconSVG.innerHTML = `<path d="M8 5v14l11-7z"/>`;
-                disc.classList.add('paused');
+                if (playIconSVG) playIconSVG.innerHTML = `<path d="M8 5v14l11-7z"/>`;
+                if (fsPlayIconSVG) fsPlayIconSVG.innerHTML = `<path d="M8 5v14l11-7z"/>`;
+                if (disc) disc.classList.add('paused');
             }
         }
 
-        // Audio Progress Update
+        // Audio Progress & Lyrics Timeline Update
         audioEngine.addEventListener('timeupdate', () => {
             if (!audioEngine.duration) return;
             const cur = audioEngine.currentTime;
@@ -1257,6 +2232,17 @@
             document.getElementById('progressFill').style.width = `${pct}%`;
             document.getElementById('currentTime').innerText = formatTime(cur);
             document.getElementById('durationTime').innerText = formatTime(dur);
+
+            if (isFullScreenLyricsOpen) {
+                syncFullScreenTime();
+            }
+
+            if (parsedLyrics && parsedLyrics.length > 0) {
+                const newIndex = findActiveLineIndex(parsedLyrics, cur);
+                if (newIndex !== currentActiveLyricIndex) {
+                    updateActiveLyricLine(newIndex);
+                }
+            }
         });
 
         audioEngine.addEventListener('ended', () => {
@@ -1275,6 +2261,15 @@
             const s = Math.floor(secs % 60) || 0;
             return `${m}:${s < 10 ? '0' : ''}${s}`;
         }
+
+        // Keyboard Esc Event Listener
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' || e.keyCode === 27) {
+                if (isFullScreenLyricsOpen) {
+                    closeFullScreenLyrics();
+                }
+            }
+        });
 
         // Delete Track
         async function deleteTrack(encodedFilename) {
@@ -1352,8 +2347,124 @@
             }
         }
 
+        // --- Volume & Mute State Management ---
+        let lastNonZeroVolume = 1.0;
+
+        function initVolumeSettings() {
+            const savedVol = localStorage.getItem('music_player_volume');
+            const savedMuted = localStorage.getItem('music_player_muted');
+
+            if (savedVol !== null) {
+                const parsed = parseFloat(savedVol);
+                if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+                    audioEngine.volume = parsed;
+                    if (parsed > 0) lastNonZeroVolume = parsed;
+                }
+            } else {
+                audioEngine.volume = 1.0;
+            }
+
+            if (savedMuted !== null) {
+                audioEngine.muted = savedMuted === 'true';
+            } else {
+                audioEngine.muted = false;
+            }
+
+            syncVolumeUI();
+        }
+
+        function setVolume(val) {
+            const num = parseFloat(val);
+            if (isNaN(num)) return;
+            const clamped = Math.max(0, Math.min(1, num));
+            audioEngine.volume = clamped;
+
+            if (clamped > 0) {
+                lastNonZeroVolume = clamped;
+                if (audioEngine.muted) {
+                    audioEngine.muted = false;
+                }
+            } else {
+                audioEngine.muted = true;
+            }
+
+            try {
+                localStorage.setItem('music_player_volume', clamped.toString());
+                localStorage.setItem('music_player_muted', audioEngine.muted.toString());
+            } catch(e) {}
+
+            syncVolumeUI();
+        }
+
+        function toggleMute() {
+            if (audioEngine.muted || audioEngine.volume === 0) {
+                audioEngine.muted = false;
+                if (audioEngine.volume === 0) {
+                    audioEngine.volume = lastNonZeroVolume > 0 ? lastNonZeroVolume : 1.0;
+                }
+            } else {
+                if (audioEngine.volume > 0) {
+                    lastNonZeroVolume = audioEngine.volume;
+                }
+                audioEngine.muted = true;
+            }
+
+            try {
+                localStorage.setItem('music_player_volume', audioEngine.volume.toString());
+                localStorage.setItem('music_player_muted', audioEngine.muted.toString());
+            } catch(e) {}
+
+            syncVolumeUI();
+        }
+
+        function syncVolumeUI() {
+            if (!audioEngine) return;
+            const effectiveVol = audioEngine.muted ? 0 : audioEngine.volume;
+            
+            const volControl = document.getElementById('volumeControl');
+            const fsVolControl = document.getElementById('fsVolumeControl');
+            const overlayVolControl = document.getElementById('overlayVolumeControl');
+
+            if (volControl) volControl.value = effectiveVol;
+            if (fsVolControl) fsVolControl.value = effectiveVol;
+            if (overlayVolControl) overlayVolControl.value = effectiveVol;
+
+            const isMuted = audioEngine.muted || effectiveVol === 0;
+            let iconClass = 'fas fa-volume-up';
+            let targetSVG = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.74 2.5-2.26 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+
+            if (isMuted) {
+                iconClass = 'fas fa-volume-mute';
+                targetSVG = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+            } else if (effectiveVol < 0.5) {
+                iconClass = 'fas fa-volume-down';
+                targetSVG = '<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.74 2.5-2.26 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
+            }
+
+            const muteBtn = document.getElementById('muteBtn');
+            const fsMuteBtn = document.getElementById('fsMuteBtn');
+            const overlayMuteBtn = document.getElementById('overlayMuteBtn');
+            const muteIconSVG = document.getElementById('muteIconSVG');
+            const overlayMuteIconSVG = document.getElementById('overlayMuteIconSVG');
+
+            if (muteBtn) muteBtn.innerHTML = `<i class="${iconClass}"></i>`;
+            if (fsMuteBtn) fsMuteBtn.innerHTML = `<i class="${iconClass}"></i>`;
+            if (overlayMuteBtn && !overlayMuteIconSVG) overlayMuteBtn.innerHTML = `<i class="${iconClass}"></i>`;
+
+            if (muteIconSVG) muteIconSVG.innerHTML = targetSVG;
+            if (overlayMuteIconSVG) overlayMuteIconSVG.innerHTML = targetSVG;
+        }
+
+        function updateVolumeUI() {
+            syncVolumeUI();
+        }
+
+        audioEngine.addEventListener('volumechange', syncVolumeUI);
+
         // Initial Load
         loadLibrary();
+        setupManualScrollListeners();
+        initVolumeSettings();
     </script>
 </body>
 </html>
