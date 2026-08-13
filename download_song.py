@@ -15,6 +15,9 @@ import traceback
 import uuid
 import re
 import concurrent.futures
+import urllib.request
+import urllib.parse
+from bs4 import BeautifulSoup
 from datetime import datetime
 
 
@@ -51,14 +54,20 @@ def save_sidecar_lyrics(filename, lyrics_text):
     return filepath
 
 
-def get_sidecar_lyrics(filename):
-    """Retrieve sidecar lyrics from .lyrics/<stem>.lrc or .lyrics/<stem>.txt with UTF-8 encoding."""
+def get_sidecar_lyrics(filename, lang=None):
+    """Retrieve sidecar lyrics from .lyrics/<stem>.<lang>.lrc, .lyrics/<stem>.lrc or .lyrics/<stem>.txt with UTF-8 encoding."""
     if not filename:
         return None
     safe_filename = os.path.basename(filename)
     stem = os.path.splitext(safe_filename)[0]
     dirs = get_dirs()
     lyrics_dir = dirs["lyrics"]
+
+    if lang:
+        lang_path = os.path.join(lyrics_dir, f"{stem}.{lang}.lrc")
+        if os.path.exists(lang_path):
+            with open(lang_path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
 
     lrc_path = os.path.join(lyrics_dir, f"{stem}.lrc")
     txt_path = os.path.join(lyrics_dir, f"{stem}.txt")
@@ -70,6 +79,312 @@ def get_sidecar_lyrics(filename):
         with open(txt_path, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
     return None
+
+
+ENGLISH_STOP_WORDS = {
+    "the", "you", "your", "that", "this", "with", "have", "was", "were",
+    "searching", "night", "trail", "follow", "repaid", "debt", "eyes", "baby",
+    "love", "like", "when", "from", "what", "about", "there", "their", "could",
+    "would", "should", "know", "never", "where", "take", "back", "met", "lord",
+    "huron", "lana", "del", "rey", "olivia", "dean", "new", "west", "citizen",
+    "vertigo", "easy", "fall"
+}
+
+HIGH_CONFIDENCE_ROMAN_URDU_WORDS = {
+    "guzre", "tumhein", "unhein", "bikhray", "iraaday", "kaha", "kahan", "zindagi",
+    "aankhon", "aankhein", "honsla", "shumaar", "khasara", "siyah", "sajde", "haaray",
+    "pyaar", "tumhara", "tumhari", "chaho", "chaha", "kaise", "kaisa", "batao",
+    "suno", "khushi", "chup", "bulaye", "jaaye", "samjho", "mehfil", "mujhse",
+    "tujhse", "zamaaney", "duniya", "sanwar", "yaad"
+}
+
+SOUTH_ASIAN_ARTISTS = [
+    "abdul hannan", "asim azhar", "hasan raheem", "annural khalid",
+    "faheem abdullah", "rovalio", "maanu", "kaifi khalil", "atif aslam",
+    "rahat fateh ali khan", "ali zafar", "young stunners", "talha anjum",
+    "talhah yunus", "bayan", "faaris", "falak shabir", "chahar", "kashmir"
+]
+
+# Expanded mapping of Roman Urdu to Urdu Nastaliq
+ROMAN_URDU_WORDS = {
+    "hum": "ہم", "pe": "پہ", "hi": "ہی", "guzre": "گزرے", "kyun": "کیوں", "kyu": "کیوں",
+    "dil": "دل", "pyar": "پیار", "pyaar": "پیار", "zindagi": "زندگی", "mera": "میرا",
+    "meri": "میری", "mere": "میرے", "kaha": "کہا", "kahan": "کہاں", "raha": "رہا",
+    "tere": "تیرے", "teri": "تیری", "tera": "تیرا", "tum": "تم", "tumhari": "تمہاری",
+    "tumhara": "تمہارا", "shab": "شب", "raat": "رات", "ho": "ہو", "haan": "ہاں",
+    "bhi": "بھی", "toh": "تو", "tou": "تو", "se": "سے", "hai": "ہے", "hain": "ہیں",
+    "mein": "میں", "mai": "میں", "ko": "کو", "kya": "کیا", "baat": "بات", "sun": "سن",
+    "ja": "جا", "aaj": "آج", "phir": "پھر", "baad": "بعد", "naam": "نام", "samajh": "سمجھ",
+    "soch": "سوچ", "chaho": "چاہو", "chaha": "چاہا", "tumhein": "تمہیں", "unhein": "انہیں",
+    "sab": "سب", "kabhi": "کبھی", "kuch": "کچھ", "woh": "وہ", "ye": "یہ", "yeh": "یہ",
+    "ik": "اک", "ek": "ایک", "paas": "پاس", "door": "دور", "batao": "بتاؤ", "suno": "سنو",
+    "chup": "چپ", "dard": "درد", "khushi": "خوشی", "yaad": "یاد", "bulaye": "بلائے",
+    "aaye": "آئے", "jaaye": "جائے", "laga": "لگا", "lagi": "لگی", "lage": "لگے",
+    "chaand": "چاند", "chaandni": "چاندنی", "aankhon": "آنکھوں", "aankhein": "آنکھیں",
+    "honsla": "حوصلہ", "saath": "ساتھ", "rooth": "روٹھ", "maan": "مان", "samjho": "سمجھو",
+    "haaray": "ہارے", "bikhray": "بکھرے", "iraaday": "ارادے", "hoon": "ہوں",
+    "hun": "ہوں", "kaise": "کیسے", "kaisa": "کیسا", "tujhse": "تجھ سے", "mujhse": "مجھ سے",
+    "jo": "جو", "gham": "غم", "bante": "بانٹتے", "tumko": "تم کو", "mile": "ملیں",
+    "jiya": "جیا", "dhadke": "دھڑکے", "yun": "یوں", "humein": "ہمیں", "ghazab": "غضب",
+    "bhara": "بھرا", "anjaam": "انجام", "de": "دے", "tarasna": "ترسنا", "muskaan": "مسکان",
+    "tu": "تو", "chala": "چلا", "akela": "اکیلا", "safar": "سفر", "humsafar": "ہمسفر",
+    "saaye": "سائے", "khoya": "کھویا", "rahi": "رہی", "nigahein": "نگاہیں", "manzil": "منزل",
+    "dhoondte": "ڈھونڈتے", "le": "لے", "lo": "لو", "mat": "مت", "karo": "کرو", "kehte": "کہتے"
+}
+
+PHONETIC_CHAR_MAP = [
+    ("ch", "چ"), ("kh", "خ"), ("gh", "غ"), ("sh", "ش"), ("th", "ت"),
+    ("ph", "ف"), ("bh", "بھ"), ("dh", "دھ"), ("jh", "جھ"), ("rh", "ڑ"),
+    ("aa", "آ"), ("ee", "ای"), ("oo", "او"), ("ou", "او"),
+    ("a", "ا"), ("b", "ب"), ("p", "پ"), ("t", "ت"), ("j", "ج"),
+    ("d", "د"), ("r", "ر"), ("z", "ز"), ("s", "س"), ("f", "ف"),
+    ("k", "ک"), ("l", "ل"), ("m", "م"), ("n", "ن"), ("w", "و"),
+    ("h", "ہ"), ("y", "ی"), ("e", "ے"), ("o", "و"), ("u", "و"), ("i", "ی")
+]
+
+def roman_word_fallback_to_urdu(word):
+    """Fallback converter that maps any remaining Latin word phonetically into Urdu script."""
+    w = word.lower().strip()
+    if not w:
+        return word
+    for orig, ur in PHONETIC_CHAR_MAP:
+        w = w.replace(orig, ur)
+    return w
+
+def is_english_song(text, filename=""):
+    """Return True if song is strictly English (e.g. Lord Huron, Lana Del Rey, Olivia Dean)."""
+    if not text:
+        return True
+    # If native Urdu script is present, not English
+    if re.search(r"[\u0600-\u06FF\u0750-\u077F]", text):
+        return False
+
+    clean_text = text.lower()
+    fn_lower = filename.lower()
+
+    # Check known South Asian artists
+    if any(artist in fn_lower for artist in SOUTH_ASIAN_ARTISTS):
+        return False
+
+    # Check for high confidence Roman Urdu keywords
+    words = set(re.findall(r"\b[a-zA-Z]+\b", clean_text))
+    if any(w in words for w in HIGH_CONFIDENCE_ROMAN_URDU_WORDS):
+        return False
+
+    # Check for English stop words
+    english_word_matches = sum(1 for w in words if w in ENGLISH_STOP_WORDS)
+    if english_word_matches >= 2 or (len(words) > 0 and (english_word_matches / len(words)) > 0.04):
+        return True
+
+    return False
+
+def transliterate_roman_to_urdu(text):
+    """Phonetically transliterate Roman Urdu lyrics lines into 100% Urdu Nastaliq script."""
+    if not text:
+        return ""
+    lines = text.splitlines()
+    res = []
+    for line in lines:
+        match = re.match(r"^(\[\d{1,2}:\d{2}(?:\.\d{2,3})?\])(.*)", line)
+        if match:
+            ts, body = match.group(1), match.group(2)
+            tokens = re.split(r"(\s+|[^\w\s])", body)
+            out_tokens = []
+            for t in tokens:
+                clean_t = t.lower().strip()
+                if not clean_t or not re.match(r"^[a-zA-Z]+$", clean_t):
+                    out_tokens.append(t)
+                elif clean_t in ROMAN_URDU_WORDS:
+                    out_tokens.append(ROMAN_URDU_WORDS[clean_t])
+                else:
+                    out_tokens.append(roman_word_fallback_to_urdu(clean_t))
+            res.append(f"{ts} {''.join(out_tokens)}")
+        else:
+            tokens = re.split(r"(\s+|[^\w\s])", line)
+            out_tokens = []
+            for t in tokens:
+                clean_t = t.lower().strip()
+                if not clean_t or not re.match(r"^[a-zA-Z]+$", clean_t):
+                    out_tokens.append(t)
+                elif clean_t in ROMAN_URDU_WORDS:
+                    out_tokens.append(ROMAN_URDU_WORDS[clean_t])
+                else:
+                    out_tokens.append(roman_word_fallback_to_urdu(clean_t))
+            res.append("".join(out_tokens))
+    return "\n".join(res)
+
+def fetch_genius_urdu_lyrics(title, artist=""):
+    """Scrape authentic Urdu translation lyrics directly from Genius.com."""
+    try:
+        clean_title = _clean_search_query(title)
+        clean_artist = _clean_search_query(artist)
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5'
+        }
+        url_candidates = []
+
+        # Construct candidate Genius slugs
+        artist_slug = re.sub(r"[^\w\s-]", "", clean_artist).strip().replace(" ", "-").lower()
+        title_slug = re.sub(r"[^\w\s-]", "", clean_title).strip().replace(" ", "-").lower()
+        
+        if artist_slug and title_slug:
+            url_candidates.append(f"https://genius.com/Genius-urdu-translations-{artist_slug}-and-{title_slug}-lyrics")
+            url_candidates.append(f"https://genius.com/Genius-urdu-translations-{artist_slug}-{title_slug}-lyrics")
+        if title_slug:
+            url_candidates.append(f"https://genius.com/Genius-urdu-translations-{title_slug}-lyrics")
+
+        # Build search query terms
+        words = re.findall(r"\b\w+\b", f"{clean_artist} {clean_title}")
+        q_terms = [
+            f"{clean_artist} {clean_title} Urdu",
+            f"{clean_artist} {clean_title}",
+            f"{clean_title} Urdu",
+            " ".join(words[:3]) + " Urdu" if len(words) >= 3 else "",
+            " ".join(words[:2]) + " Urdu" if len(words) >= 2 else ""
+        ]
+        q_terms = [q for q in q_terms if q.strip()]
+
+        # Query Genius Search API
+        headers_api = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        for q_term in q_terms:
+            try:
+                search_url = f"https://genius.com/api/search/multi?q={urllib.parse.quote(q_term)}"
+                req = urllib.request.Request(search_url, headers=headers_api)
+                res = urllib.request.urlopen(req, timeout=5)
+                data = json.loads(res.read().decode('utf-8'))
+                sections = data.get('response', {}).get('sections', [])
+                for section in sections:
+                    for hit in section.get('hits', []):
+                        item = hit.get('result') or {}
+                        path = item.get('path') or ''
+                        full_t = str(item.get('full_title') or item.get('title') or '').lower()
+                        if path and ('urdu' in path.lower() or 'urdu' in full_t or 'ترجمہ' in full_t):
+                            candidate = f"https://genius.com{path}"
+                            if candidate not in url_candidates:
+                                url_candidates.insert(0, candidate)
+            except Exception:
+                pass
+
+        for target_url in url_candidates:
+            try:
+                req = urllib.request.Request(target_url, headers=headers)
+                html = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
+                soup = BeautifulSoup(html, 'html.parser')
+                containers = soup.find_all('div', {'data-lyrics-container': 'true'})
+                if containers:
+                    raw_text = '\n'.join([c.get_text('\n') for c in containers])
+                    urdu_lines = []
+                    for raw_line in raw_text.splitlines():
+                        line = raw_line.strip()
+                        if not line or line.startswith('[') or 'Lyrics' in line or 'Contributor' in line:
+                            continue
+                        if re.search(r'[\u0600-\u06FF]', line):
+                            urdu_lines.append(line)
+                    if len(urdu_lines) >= 3:
+                        return '\n'.join(urdu_lines)
+            except Exception:
+                continue
+
+    except Exception as e:
+        print(f"Genius Urdu fetch error: {e}")
+        traceback.print_exc()
+    return None
+
+def align_urdu_with_lrc_timestamps(base_lrc, urdu_text):
+    """Align raw Urdu text lines with timestamps from base LRC file."""
+    if not base_lrc or not urdu_text:
+        return urdu_text
+
+    lrc_lines = base_lrc.splitlines()
+    urdu_lines = [l.strip() for l in urdu_text.splitlines() if l.strip() and not l.strip().startswith('[')]
+    
+    timestamps = []
+    for line in lrc_lines:
+        match = re.match(r"^(\[\d{1,2}:\d{2}(?:\.\d{2,3})?\])", line.strip())
+        if match:
+            timestamps.append(match.group(1))
+
+    if not timestamps or not urdu_lines:
+        return urdu_text
+
+    result = []
+    for i in range(min(len(timestamps), len(urdu_lines))):
+        result.append(f"{timestamps[i]} {urdu_lines[i]}")
+
+    return "\n".join(result)
+
+def get_all_sidecar_lyrics(filename):
+    """Return dictionary of all available language lyrics for a given track stem."""
+    if not filename:
+        return {}
+    safe_filename = os.path.basename(filename)
+    stem = os.path.splitext(safe_filename)[0]
+    dirs = get_dirs()
+    lyrics_dir = dirs["lyrics"]
+
+    base_lrc = get_sidecar_lyrics(filename)
+    if not base_lrc:
+        res = fetch_lyrics_multi_provider(filename)
+        base_lrc = res.get("lyrics") if isinstance(res, dict) else res
+        if base_lrc:
+            save_sidecar_lyrics(filename, base_lrc)
+
+    if not base_lrc:
+        return {}
+
+    # If it's an English song, return strictly English
+    if is_english_song(base_lrc, filename):
+        return {"english": base_lrc}
+
+    # Otherwise it's an Urdu / Pakistani / South Asian track!
+    result = {}
+    if re.search(r"[\u0600-\u06FF\u0750-\u077F]", base_lrc):
+        result["urdu"] = base_lrc
+    else:
+        result["roman"] = base_lrc
+        
+        # Check if authentic Urdu sidecar exists on disk
+        urdu_sidecar_path = os.path.join(lyrics_dir, f"{stem}.ur.lrc")
+        if not os.path.exists(urdu_sidecar_path):
+            urdu_sidecar_path = os.path.join(lyrics_dir, f"{stem}.urdu.lrc")
+
+        authentic_urdu = None
+        if os.path.exists(urdu_sidecar_path):
+            with open(urdu_sidecar_path, "r", encoding="utf-8", errors="replace") as f:
+                authentic_urdu = f.read()
+
+        # If authentic Urdu sidecar not on disk, fetch from Genius!
+        if not authentic_urdu:
+            parts = stem.split(" - ")
+            artist_name = parts[0] if len(parts) > 1 else ""
+            title_name = parts[1] if len(parts) > 1 else stem
+            
+            raw_genius_urdu = fetch_genius_urdu_lyrics(title_name, artist_name)
+            if raw_genius_urdu:
+                authentic_urdu = align_urdu_with_lrc_timestamps(base_lrc, raw_genius_urdu)
+                try:
+                    save_path = os.path.join(lyrics_dir, f"{stem}.ur.lrc")
+                    with open(save_path, "w", encoding="utf-8") as f:
+                        f.write(authentic_urdu)
+                except Exception:
+                    pass
+
+        if authentic_urdu:
+            result["urdu"] = authentic_urdu
+        else:
+            result["urdu"] = transliterate_roman_to_urdu(base_lrc)
+
+    # Check sidecar files for additional explicit translations if saved
+    for lang in ["roman", "urdu"]:
+        path = os.path.join(lyrics_dir, f"{stem}.{lang}.lrc")
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                result[lang] = f.read()
+
+    return result
 
 
 def _clean_search_query(raw):
@@ -343,53 +658,99 @@ def handle_yt_playlist(playlist_url, output_dir, dirs, audio_format="mp3", audio
 
 
 def handle_spotify(spotify_url, output_dir, dirs, audio_format="mp3", audio_quality="0"):
-    """Extract tracks from Spotify URL via spotdl, then download each."""
-    tmp = os.path.join(output_dir, f"spotify_{uuid.uuid4().hex[:8]}.spotdl")
-    if os.path.exists(tmp):
-        try: os.remove(tmp)
-        except Exception: pass
+    """Download tracks from Spotify URL via spotdl v3 direct download.
+    
+    spotdl v3.x doesn't have 'save' subcommand — it downloads directly.
+    We snapshot the output directory before/after to detect new files.
+    """
+    os.makedirs(output_dir, exist_ok=True)
 
-    r = subprocess.run(
-        [sys.executable, "-m", "spotdl", "save", spotify_url, "--save-file", tmp],
-        capture_output=True, text=True, encoding="utf-8", errors="replace"
-    )
+    # Snapshot existing files before download
+    valid_exts = {".mp3", ".flac", ".m4a", ".wav", ".opus", ".aac", ".ogg"}
+    before = set()
+    for f in os.listdir(output_dir):
+        if os.path.splitext(f)[1].lower() in valid_exts:
+            before.add(f)
 
-    if not os.path.exists(tmp):
-        return {"status": "error", "query": spotify_url,
-                "error": f"spotdl save failed. Code: {r.returncode} | stderr: {r.stderr.strip()[:300]}"}
+    # Map format names
+    fmt_map = {"mp3": "mp3", "flac": "flac", "m4a": "m4a", "wav": "wav", "ogg": "ogg", "opus": "opus"}
+    out_fmt = fmt_map.get(audio_format, "mp3")
+
+    cmd = [
+        sys.executable, "-m", "spotdl", "download",
+        spotify_url,
+        "--output", os.path.join(output_dir, "{artists} - {title}.{output-ext}"),
+        "--format", out_fmt,
+    ]
 
     try:
-        with open(tmp, "r", encoding="utf-8") as f:
-            tracks = json.load(f)
-        os.remove(tmp)
-    except Exception as e:
+        r = subprocess.run(
+            cmd, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=300
+        )
+    except subprocess.TimeoutExpired:
         return {"status": "error", "query": spotify_url,
-                "error": f"Failed to parse spotdl output: {str(e)}"}
+                "error": "spotdl download timed out after 5 minutes"}
 
-    if not tracks:
-        return {"status": "error", "query": spotify_url,
-                "error": "No tracks found in Spotify URL"}
+    # Snapshot after download to find new files
+    after = set()
+    for f in os.listdir(output_dir):
+        if os.path.splitext(f)[1].lower() in valid_exts:
+            after.add(f)
 
-    queries = []
-    for t in tracks:
-        if isinstance(t, dict):
-            artists = ", ".join(t.get("artists", ["Unknown"]))
-            name = t.get("name", "Unknown")
-            queries.append(f"{artists} {name}")
-        elif isinstance(t, str):
-            queries.append(t)
+    new_files = after - before
 
+    if not new_files:
+        # Check if spotdl itself reported an error
+        stderr_clean = r.stderr.strip() if r.stderr else ""
+        # Filter out the pkg_resources deprecation warning noise
+        stderr_lines = [l for l in stderr_clean.split("\n")
+                        if "pkg_resources" not in l and "UserWarning" not in l
+                        and "import pkg_resources" not in l and "RuntimeWarning" not in l
+                        and l.strip()]
+        stderr_msg = "\n".join(stderr_lines)[:300] if stderr_lines else "No new files downloaded"
+        
+        if r.returncode != 0:
+            return {"status": "error", "query": spotify_url,
+                    "error": f"spotdl failed (code {r.returncode}): {stderr_msg}"}
+        else:
+            return {"status": "error", "query": spotify_url,
+                    "error": f"spotdl completed but no new files found. {stderr_msg}"}
+
+    # Build results from newly downloaded files
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_query = {executor.submit(download_single, q, output_dir, dirs, audio_format, audio_quality): q for q in queries}
-        for future in concurrent.futures.as_completed(future_to_query):
-            res = future.result()
-            log_download(dirs["log"], res)
-            results.append(res)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for fname in new_files:
+        fpath = os.path.join(output_dir, fname)
+        fsize = os.path.getsize(fpath) if os.path.exists(fpath) else 0
+        raw_name = os.path.splitext(fname)[0]
 
-    ok = sum(1 for x in results if x["status"] == "success")
+        # Parse artist/title from filename
+        title = raw_name
+        artist = "Unknown"
+        if " - " in raw_name:
+            parts = raw_name.split(" - ", 1)
+            artist = parts[0].strip()
+            title = parts[1].strip()
+
+        # Auto-fetch lyrics for each new track
+        try:
+            auto_fetch_and_save_lyrics(fname, title=title, uploader=artist)
+        except Exception:
+            pass
+
+        result = {
+            "status": "success", "query": spotify_url, "title": title,
+            "uploader": artist, "url": spotify_url, "filepath": fpath,
+            "filename": fname, "file_size_mb": round(fsize / 1024 / 1024, 2),
+            "timestamp": now
+        }
+        log_download(dirs["log"], result)
+        results.append(result)
+
+    ok = len(results)
     return {"status": "playlist_done", "source": "spotify",
-            "total": len(queries), "downloaded": ok, "results": results}
+            "total": ok, "downloaded": ok, "results": results}
 
 
 def get_track_preview(query):
