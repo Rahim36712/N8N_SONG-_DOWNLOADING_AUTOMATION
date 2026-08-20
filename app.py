@@ -5,6 +5,8 @@ import traceback
 import download_song
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 @app.after_request
 def add_header(response):
@@ -144,33 +146,68 @@ def api_preview():
 @app.route("/api/lyrics", methods=["GET"])
 def api_get_lyrics():
     filename = request.args.get("filename") or request.args.get("query")
+    refresh_param = request.args.get("refresh", "").lower() in ["true", "1", "yes"]
+
     if not filename:
         return jsonify({"status": "error", "error": "Filename or query parameter required"}), 400
 
     safe_filename = os.path.basename(filename)
-    sidecar_content = download_song.get_sidecar_lyrics(safe_filename)
+    stem = os.path.splitext(safe_filename)[0]
+    dirs = download_song.get_dirs()
+    lyrics_dir = dirs["lyrics"]
 
-    if sidecar_content is not None:
-        synced = download_song.is_lrc_synced(sidecar_content)
+    if refresh_param:
+        for ext in [".lrc", ".ur.lrc", ".urdu.lrc", ".roman.lrc", ".txt"]:
+            target_f = os.path.join(lyrics_dir, f"{stem}{ext}")
+            if os.path.exists(target_f):
+                try:
+                    os.remove(target_f)
+                except Exception:
+                    pass
+
+    sidecars = download_song.get_all_sidecar_lyrics(safe_filename)
+
+    if not sidecars:
+        # Fetch via cascade if missing
+        result = download_song.fetch_lyrics_multi_provider(safe_filename)
+        lyrics = result.get("lyrics") if isinstance(result, dict) else result
+        if lyrics:
+            download_song.save_sidecar_lyrics(safe_filename, lyrics)
+            sidecars = download_song.get_all_sidecar_lyrics(safe_filename)
+
+    if not sidecars:
         return jsonify({
             "status": "success",
-            "synced": synced,
-            "lyrics": sidecar_content
+            "synced": False,
+            "lyrics": None,
+            "has_dual": False,
+            "languages": [],
+            "lyrics_by_lang": {}
         })
 
-    # Fetch via cascade if missing
-    result = download_song.fetch_lyrics_multi_provider(safe_filename)
-    lyrics = result.get("lyrics") if isinstance(result, dict) else result
-    synced = result.get("synced", download_song.is_lrc_synced(lyrics)) if isinstance(result, dict) else download_song.is_lrc_synced(lyrics)
-
-    if lyrics:
-        download_song.save_sidecar_lyrics(safe_filename, lyrics)
+    # Primary content
+    primary_lang = list(sidecars.keys())[0]
+    primary_content = sidecars[primary_lang]
+    synced = download_song.is_lrc_synced(primary_content)
+    has_dual = "dual" in sidecars or ("urdu" in sidecars and ("roman" in sidecars or "english" in sidecars))
 
     return jsonify({
         "status": "success",
         "synced": synced,
-        "lyrics": lyrics
+        "lyrics": primary_content,
+        "has_dual": has_dual,
+        "languages": list(sidecars.keys()),
+        "lyrics_by_lang": sidecars
     })
+
+
+@app.route("/api/lyrics/refresh", methods=["POST"])
+def api_lyrics_refresh():
+    data = request.get_json(silent=True) or {}
+    purge_all = bool(data.get("purge_all", False))
+    dirs = download_song.get_dirs()
+    res = download_song.purge_and_reindex_lyrics(dirs, purge_all=purge_all)
+    return jsonify(res)
 
 
 @app.route("/api/lyrics/save", methods=["POST"])
