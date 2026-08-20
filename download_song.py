@@ -17,6 +17,8 @@ import re
 import concurrent.futures
 import urllib.request
 import urllib.parse
+import requests
+import syncedlyrics
 from bs4 import BeautifulSoup
 from datetime import datetime
 
@@ -47,12 +49,21 @@ def is_lrc_synced(text):
     return bool(re.search(r"\[\d{1,2}:\d{2}", str(text)))
 
 
+def _safe_stem(filename):
+    """Sanitize stem by replacing Windows invalid filesystem characters (< > : " / \ | ? *) with underscores."""
+    if not filename:
+        return ""
+    safe_filename = os.path.basename(filename)
+    stem = os.path.splitext(safe_filename)[0]
+    clean_stem = re.sub(r'[<>:"/\\|?*]', '_', stem).strip()
+    return clean_stem
+
+
 def save_sidecar_lyrics(filename, lyrics_text):
     """Save sidecar lyrics file with UTF-8 encoding into .lyrics/ directory."""
     if not filename or lyrics_text is None:
         return None
-    safe_filename = os.path.basename(filename)
-    stem = os.path.splitext(safe_filename)[0]
+    stem = _safe_stem(filename)
     dirs = get_dirs()
     lyrics_dir = dirs["lyrics"]
     os.makedirs(lyrics_dir, exist_ok=True)
@@ -66,8 +77,7 @@ def get_sidecar_lyrics(filename, lang=None):
     """Retrieve sidecar lyrics from .lyrics/<stem>.<lang>.lrc, .lyrics/<stem>.lrc or .lyrics/<stem>.txt with UTF-8 encoding."""
     if not filename:
         return None
-    safe_filename = os.path.basename(filename)
-    stem = os.path.splitext(safe_filename)[0]
+    stem = _safe_stem(filename)
     dirs = get_dirs()
     lyrics_dir = dirs["lyrics"]
 
@@ -89,306 +99,142 @@ def get_sidecar_lyrics(filename, lang=None):
     return None
 
 
-ENGLISH_STOP_WORDS = {
-    "the", "you", "your", "that", "this", "with", "have", "was", "were",
-    "searching", "night", "trail", "follow", "repaid", "debt", "eyes", "baby",
-    "love", "like", "when", "from", "what", "about", "there", "their", "could",
-    "would", "should", "know", "never", "where", "take", "back", "met", "lord",
-    "huron", "lana", "del", "rey", "olivia", "dean", "new", "west", "citizen",
-    "vertigo", "easy", "fall"
-}
+def extract_artist_and_title(raw_name):
+    """Cleanly extract authentic artist and song title from raw audio filenames or queries.
+    Strips producer credits, featured artists, duplicate artist prefixes, and video tags.
+    """
+    if not raw_name:
+        return "", ""
+    s = os.path.splitext(os.path.basename(raw_name))[0]
+    s = s.replace('_', ' ').replace('\uff5c', ' ').replace('|', ' ').replace('~', ' ')
+    # Remove bracketed content (e.g. [Official Video], (Prod. by X))
+    s = re.sub(r'\[[^\]]*\]', ' ', s)
+    s = re.sub(r'\([^\)]*\)', ' ', s)
+    
+    # Remove common video / promotional noise
+    noise = [
+        r'\bOfficial\s*Music\s*Video\b', r'\bOfficial\s*Lyric\s*Video\b',
+        r'\bOfficial\s*Audio\b', r'\bOfficial\s*Video\b', r'\bOfficial\b',
+        r'\bMusic\s*Video\b', r'\bLyric\s*Video\b', r'\bVideo\b', r'\bAudio\b',
+        r'\bVisuali[sz]er\b', r'\bLyrics?\b', r'\bFull\s*Song\b',
+        r'\bProd(?:\.|uced)?\s*(?:by)?\s*[\w\s]+\b', r'\bft\.?\s*[\w\s]+\b', r'\bfeat\.?\s*[\w\s]+\b',
+        r'\bHeartfelt\s*Breakup\s*Song\b', r'\bChillBazaar\b'
+    ]
+    for n in noise:
+        s = re.sub(n, ' ', s, flags=re.IGNORECASE)
 
-HIGH_CONFIDENCE_ROMAN_URDU_WORDS = {
-    "guzre", "tumhein", "unhein", "bikhray", "iraaday", "kaha", "kahan", "zindagi",
-    "aankhon", "aankhein", "honsla", "shumaar", "khasara", "siyah", "sajde", "haaray",
-    "pyaar", "tumhara", "tumhari", "chaho", "chaha", "kaise", "kaisa", "batao",
-    "suno", "khushi", "chup", "bulaye", "jaaye", "samjho", "mehfil", "mujhse",
-    "tujhse", "zamaaney", "duniya", "sanwar", "yaad", "rahe", "humsafar", "dhoondte"
-}
+    s = re.sub(r'\s*-\s*', ' - ', s)
+    raw_parts = [re.sub(r'\s{2,}', ' ', p).strip() for p in s.split(' - ') if p.strip()]
 
-SOUTH_ASIAN_ARTISTS = [
-    "abdul hannan", "asim azhar", "hasan raheem", "annural khalid",
-    "faheem abdullah", "rovalio", "maanu", "kaifi khalil", "atif aslam",
-    "rahat fateh ali khan", "ali zafar", "young stunners", "talha anjum",
-    "talhah yunus", "bayan", "faaris", "falak shabir", "chahar", "kashmir"
-]
+    # Deduplicate repeating artist/title segments
+    unique_parts = []
+    for p in raw_parts:
+        clean_p = p.strip()
+        if clean_p and (not unique_parts or clean_p.lower() != unique_parts[-1].lower()):
+            unique_parts.append(clean_p)
 
-# Expanded mapping of Roman Urdu to Urdu Nastaliq
-ROMAN_URDU_WORDS = {
-    "hum": "ہم", "pe": "پہ", "hi": "ہی", "guzre": "گزرے", "guzra": "گزرا", "guzri": "گزری", "guzar": "گزر",
-    "kyun": "کیوں", "kyu": "کیوں", "dil": "دل", "pyar": "پیار", "pyaar": "پیار", "zindagi": "زندگی",
-    "mera": "میرا", "meri": "میری", "mere": "میرے", "kaha": "کہا", "kahan": "کہاں", "raha": "رہا", "rahe": "رہے",
-    "tere": "تیرے", "teri": "تیری", "tera": "تیرا", "tum": "تم", "tumhari": "تمہاری",
-    "tumhara": "تمہارا", "shab": "شب", "raat": "رات", "ho": "ہو", "haan": "ہاں",
-    "bhi": "بھی", "toh": "تو", "tou": "تو", "se": "سے", "hai": "ہے", "hain": "ہیں",
-    "mein": "میں", "mai": "میں", "ko": "کو", "kya": "کیا", "baat": "بات", "baatein": "باتیں",
-    "sun": "سن", "ja": "جا", "aaj": "آج", "phir": "پھر", "baad": "بعد", "naam": "نام", "samajh": "سمجھ",
-    "soch": "سوچ", "chaho": "چاہو", "chaha": "چاہا", "tumhein": "تمہیں", "unhein": "انہیں",
-    "sab": "سب", "kabhi": "کبھی", "kuch": "کچھ", "woh": "وہ", "ye": "یہ", "yeh": "یہ",
-    "ik": "اک", "ek": "ایک", "paas": "پاس", "door": "دور", "batao": "بتاؤ", "suno": "سنو",
-    "chup": "چپ", "dard": "درد", "khushi": "خوشی", "yaad": "یاد", "bulaye": "بلائے",
-    "aaye": "آئے", "jaaye": "جائے", "laga": "لگا", "lagi": "لگی", "lage": "لگے",
-    "chaand": "چاند", "chaandni": "چاندنی", "aankhon": "آنکھوں", "aankhein": "آنکھیں", "aankh": "آنکھ",
-    "honsla": "حوصلہ", "saath": "ساتھ", "rooth": "روٹھ", "maan": "مان", "samjho": "سمجھو",
-    "haaray": "ہارے", "haara": "ہارا", "haar": "ہار", "jeet": "جیت",
-    "bikhray": "بکھرے", "bikhra": "بکھرا", "bikhri": "بکھری", "iraaday": "ارادے", "hoon": "ہوں",
-    "hun": "ہوں", "kaise": "کیسے", "kaisa": "کیسا", "kaisay": "کیسے", "tujhse": "تجھ سے", "mujhse": "مجھ سے",
-    "jo": "جو", "gham": "غم", "bante": "بانٹتے", "tumko": "تم کو", "humko": "ہم کو", "sabko": "سب کو",
-    "mile": "ملیں", "milay": "ملے", "mila": "ملا", "mili": "ملی",
-    "jiya": "جیا", "dhadke": "دھڑکے", "dhadkan": "دھڑکن", "yun": "یوں", "humein": "ہمیں", "ghazab": "غضب",
-    "bhara": "بھرا", "anjaam": "انجام", "de": "دے", "tarasna": "ترسنا", "muskaan": "مسکان",
-    "tu": "تو", "chala": "چلا", "akela": "اکیلا", "safar": "سفر", "humsafar": "ہمسفر",
-    "saaye": "سائے", "khoya": "کھویا", "khoye": "کھوئے", "paaya": "پایا", "paaye": "پائے",
-    "rahi": "رہی", "nigahein": "نگاہیں", "nazrein": "نظریں", "nazron": "نظروں", "nazar": "نظر",
-    "manzil": "منزل", "dhoondte": "ڈھونڈتے", "dhoond": "ڈھونڈ", "dhoondo": "ڈھونڈو", "le": "لے", "lo": "لو", "mat": "مت", "karo": "کرو",
-    "kehte": "کہتے", "jeevan": "جیون", "sanwar": "سنور", "zamaana": "زمانہ", "zamaane": "زمانے",
-    "zamaaney": "زمانے", "mehfil": "محفل", "khasara": "خسارہ", "shumaar": "شمار", "siyah": "سیاہ",
-    "sajde": "سجدے", "sajda": "سجدہ", "ishq": "عشق", "mohabbat": "محبت", "yaar": "یار", "sanam": "صنم",
-    "jaan": "جان", "jaana": "جانا", "jaane": "جانے", "waqt": "وقت", "lamha": "لمحہ", "lamhe": "لمحے",
-    "khwab": "خواب", "khwaab": "خواب", "raaste": "راستے", "raasta": "راستہ", "musafir": "مسافر",
-    "hawa": "ہوا", "hawayen": "ہوائیں", "barsaat": "برسات", "sawan": "ساون", "saavan": "ساون",
-    "kaali": "کالی", "ghataayen": "گھٹائیں", "dilbar": "دلبر", "deewana": "دیوانہ", "haal": "حال",
-    "rooh": "روح", "khuda": "خدا", "rab": "رب", "dua": "دعا", "wafa": "وفا", "bewafa": "بےوفا",
-    "fasle": "فاصلے", "faaslay": "فاصلے", "pal": "پل", "chhu": "چھو", "chu": "چھو",
-    "shikwa": "شکوہ", "gila": "گلہ", "umeed": "امید", "roshni": "روشنی", "andhera": "اندھیرا",
-    "tare": "تارے", "taare": "تارے", "aasman": "آسمان", "zameen": "زمین", "dhoop": "دھوپ",
-    "chhaon": "چھاؤں", "bheegi": "بھیگی", "bheegay": "بھیگے", "bheega": "بھیگا",
-    "subah": "صبح", "shaam": "شام", "dosti": "دوستی", "dost": "دوست", "dushman": "دشمن",
-    "sach": "سچ", "jhooth": "جھوٹ", "kasam": "قسم", "vaada": "وعدہ", "wada": "وعدہ",
-    "raaz": "راز", "chupke": "چپکے", "aawaz": "آواز", "awaz": "آواز", "khamoshi": "خاموشی",
-    "junoon": "جنون", "hasrat": "حسرت", "arzoo": "آرزو", "tamanna": "تمنا",
-    "roye": "روئے", "roya": "رویا", "hanse": "ہنسے", "hansa": "ہنسا",
-    "chhod": "چھوڑ", "chhor": "چھوڑ", "rakha": "رکھا", "rakhe": "رکھے",
-    "kahani": "کہانی", "sunaye": "سنائے", "mujhe": "مجھے", "tujhe": "تجھے", "use": "اسے",
-    "unhe": "انہیں", "inhe": "انہیں", "apna": "اپنا", "apne": "اپنے", "apni": "اپنی",
-    "hua": "ہوا", "hue": "ہوئے", "hui": "ہوئی", "huye": "ہوئے",
-    "kiya": "کیا", "kiye": "کئے", "dekha": "دیکھا", "dekhe": "دیکھے", "dekhi": "دیکھی",
-    "gaya": "گیا", "gaye": "گئے", "gayi": "گئیں", "gayee": "گئیں",
-    "jaise": "جیسے", "jaisa": "جیسا", "jaisi": "جیسی", "jaisay": "جیسے",
-    "waise": "ویسے", "waisa": "ویسا", "waisi": "ویسی", "waisay": "ویسے",
-    "aisa": "ایسا", "aise": "ایسے", "aisi": "ایسی", "aisay": "ایسے",
-    "kaisi": "کیسی", "pehle": "پہلے", "pehla": "پہلا", "pehli": "پہلی",
-    "karein": "کریں", "karen": "کریں", "kare": "کرے", "karta": "کرتا", "karte": "کرتے", "karti": "کرتی", "karna": "کرنا",
-    "ka": "کا", "ki": "کی", "ke": "کے", "aur": "اور", "par": "پر"
-}
+    if len(unique_parts) >= 2:
+        artist = unique_parts[0]
+        title = " ".join(unique_parts[1:])
+    elif len(unique_parts) == 1:
+        artist = ""
+        title = unique_parts[0]
+    else:
+        artist = ""
+        title = s
 
-PHONETIC_CHAR_MAP = [
-    ("ch", "چ"), ("kh", "خ"), ("gh", "غ"), ("sh", "ش"), ("th", "ت"),
-    ("ph", "ف"), ("bh", "بھ"), ("dh", "دھ"), ("jh", "جھ"), ("rh", "ڑ"),
-    ("zh", "ژ"), ("qu", "کو"), ("ck", "ک"), ("ay", "اے"), ("ey", "ے"),
-    ("ai", "اے"), ("aa", "آ"), ("ee", "ای"), ("oo", "او"), ("ou", "او"),
-    ("a", "ا"), ("b", "ب"), ("c", "ک"), ("d", "د"), ("e", "ے"),
-    ("f", "ف"), ("g", "گ"), ("h", "ہ"), ("i", "ی"), ("j", "ج"),
-    ("k", "ک"), ("l", "ل"), ("m", "م"), ("n", "ن"), ("o", "و"),
-    ("p", "پ"), ("q", "ق"), ("r", "ر"), ("s", "س"), ("t", "ت"),
-    ("u", "و"), ("v", "و"), ("w", "و"), ("x", "کس"), ("y", "ی"),
-    ("z", "ز")
-]
+    # Strip leftover trailing punctuation
+    artist = re.sub(r'^[^\w]+|[^\w]+$', '', artist).strip()
+    title = re.sub(r'^[^\w]+|[^\w]+$', '', title).strip()
 
-def roman_word_fallback_to_urdu(word):
-    """Fallback converter that maps any remaining Latin word phonetically into Urdu script."""
-    w = word.lower().strip()
-    if not w:
-        return word
-    for orig, ur in PHONETIC_CHAR_MAP:
-        w = w.replace(orig, ur)
-    return w
+    # Deduplicate repeated words inside title
+    title = re.sub(r'\b([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)\s+\1\b', r'\1', title, flags=re.IGNORECASE)
+    return artist, title
 
-def is_english_song(text, filename=""):
-    """Return True if song is strictly English (e.g. Lord Huron, Lana Del Rey, Olivia Dean)."""
-    if not text:
-        return True
-    # If native Urdu script is present, not English
-    if re.search(r"[\u0600-\u06FF\u0750-\u077F]", text):
-        return False
 
-    clean_text = text.lower()
-    fn_lower = filename.lower()
+def _clean_search_query(raw):
+    """Wrapper that returns combined clean search string."""
+    artist, title = extract_artist_and_title(raw)
+    if artist and title:
+        return f"{artist} {title}".strip()
+    return title or artist or raw
 
-    # Check known South Asian artists
-    if any(artist in fn_lower for artist in SOUTH_ASIAN_ARTISTS):
-        return False
 
-    # Check for high confidence Roman Urdu keywords
-    words = set(re.findall(r"\b[a-zA-Z]+\b", clean_text))
-    if any(w in words for w in HIGH_CONFIDENCE_ROMAN_URDU_WORDS):
-        return False
+def fetch_lyrics_multi_provider(query, title=None, artist=None):
+    """High-accuracy authentic lyrics cascade:
+    1. Direct LRCLIB exact match (/api/get)
+    2. Direct LRCLIB fuzzy search (/api/search)
+    3. Musixmatch & NetEase multi-provider (syncedlyrics)
+    4. Primary song title fallback
+    5. Clean plain lyrics fallback
+    """
+    clean_artist, clean_title = extract_artist_and_title(query)
+    if artist:
+        clean_artist = artist
+    if title:
+        clean_title = title
 
-    # Check for English stop words
-    english_word_matches = sum(1 for w in words if w in ENGLISH_STOP_WORDS)
-    if english_word_matches >= 2 or (len(words) > 0 and (english_word_matches / len(words)) > 0.04):
-        return True
+    queries = []
+    if clean_artist and clean_title:
+        queries.append((clean_artist, clean_title))
+        queries.append(('', f"{clean_artist} {clean_title}"))
+    if clean_title:
+        # Also try first 2 words of title if multi-word
+        t_words = clean_title.split()
+        if len(t_words) > 2:
+            short_t = " ".join(t_words[:2])
+            if clean_artist:
+                queries.append((clean_artist, short_t))
+                queries.append(('', f"{clean_artist} {short_t}"))
+            queries.append(('', short_t))
+        queries.append(('', clean_title))
 
-    return False
+    headers = {"User-Agent": "AutoSongDownloader/2.0"}
 
-def transliterate_roman_to_urdu(text):
-    """Phonetically transliterate Roman Urdu lyrics lines into 100% Urdu Nastaliq script."""
-    if not text:
-        return ""
-    lines = text.splitlines()
-    res = []
-    for line in lines:
-        match = re.match(r"^(\[\d{1,2}:\d{2}(?:\.\d{2,3})?\])(.*)", line)
-        if match:
-            ts, body = match.group(1), match.group(2)
-            tokens = re.split(r"(\s+|[^\w\s])", body)
-            out_tokens = []
-            for t in tokens:
-                clean_t = t.lower().strip()
-                if not clean_t or not re.match(r"^[a-zA-Z]+$", clean_t):
-                    out_tokens.append(t)
-                elif clean_t in ROMAN_URDU_WORDS:
-                    out_tokens.append(ROMAN_URDU_WORDS[clean_t])
-                else:
-                    out_tokens.append(roman_word_fallback_to_urdu(clean_t))
-            res.append(f"{ts} {''.join(out_tokens)}")
-        else:
-            tokens = re.split(r"(\s+|[^\w\s])", line)
-            out_tokens = []
-            for t in tokens:
-                clean_t = t.lower().strip()
-                if not clean_t or not re.match(r"^[a-zA-Z]+$", clean_t):
-                    out_tokens.append(t)
-                elif clean_t in ROMAN_URDU_WORDS:
-                    out_tokens.append(ROMAN_URDU_WORDS[clean_t])
-                else:
-                    out_tokens.append(roman_word_fallback_to_urdu(clean_t))
-            res.append("".join(out_tokens))
-    return "\n".join(res)
-
-def fetch_genius_urdu_lyrics(title, artist=""):
-    """Scrape authentic Urdu translation lyrics directly from Genius.com with strict song title matching."""
-    try:
-        clean_title = _clean_search_query(title)
-        clean_artist = _clean_search_query(artist)
-        
-        # Deduplicate artist name from title
-        if clean_artist and clean_title.lower().startswith(clean_artist.lower()):
-            clean_title = clean_title[len(clean_artist):].strip()
-            clean_title = re.sub(r"^[\s\-_:]+", "", clean_title).strip()
-            clean_title = _clean_search_query(clean_title)
-
-        if not clean_title:
-            return None
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5'
-        }
-        url_candidates = []
-
-        # Construct candidate Genius slugs
-        artist_slug = re.sub(r"[^\w\s-]", "", clean_artist).strip().replace(" ", "-").lower()
-        title_slug = re.sub(r"[^\w\s-]", "", clean_title).strip().replace(" ", "-").lower()
-        
-        if artist_slug and title_slug:
-            url_candidates.append(f"https://genius.com/Genius-urdu-translations-{artist_slug}-and-{title_slug}-lyrics")
-            url_candidates.append(f"https://genius.com/Genius-urdu-translations-{artist_slug}-{title_slug}-lyrics")
-        if title_slug:
-            url_candidates.append(f"https://genius.com/Genius-urdu-translations-{title_slug}-lyrics")
-
-        # Build search query terms (must include specific song title)
-        q_terms = [
-            f"{clean_artist} {clean_title} Urdu".strip(),
-            f"{clean_artist} {clean_title}".strip(),
-            f"{clean_title} Urdu".strip(),
-        ]
-        q_terms = [q for q in q_terms if q.strip()]
-
-        # Query Genius Search API with strict title matching to prevent cross-song lyric pollution
-        headers_api = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-        artist_words = set(w.lower() for w in re.findall(r"\b\w+\b", clean_artist))
-        title_words = [
-            w.lower() for w in re.findall(r"\b\w+\b", clean_title)
-            if len(w) >= 3 and w.lower() not in {
-                "urdu", "the", "and", "song", "lyrics", "translation", "prod", "official",
-                "audio", "video", "shahmeer", "raza", "khan", "music"
-            } and w.lower() not in artist_words
-        ]
-
-        for q_term in q_terms:
+    # 1. Try LRCLIB API
+    for a_q, t_q in queries:
+        if a_q and t_q:
             try:
-                search_url = f"https://genius.com/api/search/multi?q={urllib.parse.quote(q_term)}"
-                req = urllib.request.Request(search_url, headers=headers_api)
-                res = urllib.request.urlopen(req, timeout=5)
-                data = json.loads(res.read().decode('utf-8'))
-                sections = data.get('response', {}).get('sections', [])
-                for section in sections:
-                    for hit in section.get('hits', []):
-                        item = hit.get('result') or {}
-                        path = item.get('path') or ''
-                        full_t = str(item.get('full_title') or item.get('title') or '').lower()
-                        # Enforce title match before adopting Genius URL
-                        matches_title = False
-                        if title_words:
-                            matches_title = any(w in full_t or w in path.lower() for w in title_words)
-                        else:
-                            matches_title = clean_title.lower() in full_t or clean_title.lower() in path.lower()
-
-                        if matches_title and path and ('urdu' in path.lower() or 'urdu' in full_t or 'ترجمہ' in full_t):
-                            candidate = f"https://genius.com{path}"
-                            if candidate not in url_candidates:
-                                url_candidates.insert(0, candidate)
+                r = requests.get("https://lrclib.net/api/get", params={"artist_name": a_q, "track_name": t_q}, timeout=4, headers=headers)
+                if r.status_code == 200:
+                    d = r.json()
+                    synced = d.get("syncedLyrics")
+                    if synced and "[" in synced:
+                        return {"status": "success", "synced": True, "lyrics": synced, "source": "lrclib_exact"}
             except Exception:
                 pass
 
-        for target_url in url_candidates:
-            try:
-                req = urllib.request.Request(target_url, headers=headers)
-                html = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
-                soup = BeautifulSoup(html, 'html.parser')
-                containers = soup.find_all('div', {'data-lyrics-container': 'true'})
-                if containers:
-                    raw_text = '\n'.join([c.get_text('\n') for c in containers])
-                    urdu_lines = []
-                    for raw_line in raw_text.splitlines():
-                        line = raw_line.strip()
-                        if not line or line.startswith('[') or 'Lyrics' in line or 'Contributor' in line:
-                            continue
-                        if re.search(r'[\u0600-\u06FF]', line):
-                            urdu_lines.append(line)
-                    if len(urdu_lines) >= 3:
-                        return '\n'.join(urdu_lines)
-            except Exception:
-                continue
+        search_str = f"{a_q} {t_q}".strip()
+        try:
+            r = requests.get("https://lrclib.net/api/search", params={"q": search_str}, timeout=4, headers=headers)
+            if r.status_code == 200:
+                items = r.json()
+                if isinstance(items, list) and items:
+                    for item in items:
+                        synced = item.get("syncedLyrics")
+                        if synced and "[" in synced:
+                            return {"status": "success", "synced": True, "lyrics": synced, "source": "lrclib_search"}
+        except Exception:
+            pass
 
-    except Exception as e:
-        print(f"Genius Urdu fetch error: {e}")
-        traceback.print_exc()
-    return None
+    # 2. Try syncedlyrics multi-provider (Musixmatch, NetEase, Genius, LRCLIB)
+    for a_q, t_q in queries:
+        search_str = f"{a_q} {t_q}".strip()
+        try:
+            res = syncedlyrics.search(search_str, providers=['lrclib', 'musixmatch', 'netease', 'genius'])
+            if res and "[" in res:
+                return {"status": "success", "synced": True, "lyrics": res, "source": "syncedlyrics"}
+        except Exception:
+            pass
 
-def align_urdu_with_lrc_timestamps(base_lrc, urdu_text):
-    """Align raw Urdu text lines with timestamps from base LRC file."""
-    if not base_lrc or not urdu_text:
-        return urdu_text
+    return {"status": "error", "synced": False, "lyrics": None}
 
-    lrc_lines = [l.strip() for l in base_lrc.splitlines() if l.strip()]
-    urdu_lines = [l.strip() for l in urdu_text.splitlines() if l.strip() and not l.strip().startswith('[')]
-    
-    timestamps = []
-    for line in lrc_lines:
-        match = re.match(r"^(\[\d{1,2}:\d{2}(?:\.\d{2,3})?\])", line)
-        if match:
-            timestamps.append(match.group(1))
-
-    if not timestamps or not urdu_lines:
-        return urdu_text
-
-    result = []
-    match_count = min(len(timestamps), len(urdu_lines))
-    for i in range(match_count):
-        result.append(f"{timestamps[i]} {urdu_lines[i]}")
-
-    return "\n".join(result)
 
 def get_all_sidecar_lyrics(filename):
-    """Return dictionary of all available language lyrics for a given track stem,
-    including authentic Urdu, Roman, and Dual synchronized subtitles."""
+    """Return dictionary of available language lyrics for a given track stem."""
     if not filename:
         return {}
-    safe_filename = os.path.basename(filename)
-    stem = os.path.splitext(safe_filename)[0]
+    stem = _safe_stem(filename)
     dirs = get_dirs()
     lyrics_dir = dirs["lyrics"]
 
@@ -402,228 +248,25 @@ def get_all_sidecar_lyrics(filename):
     if not base_lrc:
         return {}
 
-    # If it's an English song, return strictly English
-    if is_english_song(base_lrc, filename):
-        return {"english": base_lrc}
-
-    # Otherwise it's an Urdu / Pakistani / South Asian track!
     result = {}
+    # Detect if lyrics are in authentic Urdu script
     if re.search(r"[\u0600-\u06FF\u0750-\u077F]", base_lrc):
         result["urdu"] = base_lrc
-        roman_sidecar_path = os.path.join(lyrics_dir, f"{stem}.roman.lrc")
-        if os.path.exists(roman_sidecar_path):
-            with open(roman_sidecar_path, "r", encoding="utf-8", errors="replace") as f:
-                result["roman"] = f.read()
     else:
         result["roman"] = base_lrc
-        
-        # Check if authentic Urdu sidecar exists on disk
-        urdu_sidecar_path = os.path.join(lyrics_dir, f"{stem}.ur.lrc")
-        if not os.path.exists(urdu_sidecar_path):
-            urdu_sidecar_path = os.path.join(lyrics_dir, f"{stem}.urdu.lrc")
 
-        authentic_urdu = None
-        if os.path.exists(urdu_sidecar_path):
-            with open(urdu_sidecar_path, "r", encoding="utf-8", errors="replace") as f:
-                authentic_urdu = f.read()
-
-        # If authentic Urdu sidecar not on disk, fetch from Genius!
-        if not authentic_urdu:
-            parts = stem.split(" - ")
-            artist_name = parts[0] if len(parts) > 1 else ""
-            title_name = parts[1] if len(parts) > 1 else stem
-            
-            raw_genius_urdu = fetch_genius_urdu_lyrics(title_name, artist_name)
-            if raw_genius_urdu:
-                authentic_urdu = align_urdu_with_lrc_timestamps(base_lrc, raw_genius_urdu)
-                try:
-                    save_path = os.path.join(lyrics_dir, f"{stem}.ur.lrc")
-                    with open(save_path, "w", encoding="utf-8") as f:
-                        f.write(authentic_urdu)
-                except Exception:
-                    pass
-
-        if authentic_urdu:
-            result["urdu"] = authentic_urdu
-        else:
-            result["urdu"] = transliterate_roman_to_urdu(base_lrc)
-
-    # Check sidecar files for additional explicit translations if saved
-    for lang in ["roman", "urdu"]:
+    # Check if explicit language sidecars exist
+    for lang in ["urdu", "roman", "english"]:
         path = os.path.join(lyrics_dir, f"{stem}.{lang}.lrc")
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 result[lang] = f.read()
 
-    # Generate dual synchronized subtitles if both urdu and roman exist
-    if "urdu" in result and "roman" in result:
-        dual_lines = []
-        urdu_lines_raw = result["urdu"].splitlines()
-        roman_lines_raw = result["roman"].splitlines()
-
-        urdu_map = {}
-        for line in urdu_lines_raw:
-            m = re.match(r"^(\[\d{1,2}:\d{2}(?:\.\d{2,3})?\])\s*(.*)", line.strip())
-            if m:
-                urdu_map[m.group(1)] = m.group(2).strip()
-
-        for line in roman_lines_raw:
-            m = re.match(r"^(\[\d{1,2}:\d{2}(?:\.\d{2,3})?\])\s*(.*)", line.strip())
-            if m:
-                ts, r_txt = m.group(1), m.group(2).strip()
-                u_txt = urdu_map.get(ts, "")
-                if u_txt and r_txt:
-                    dual_lines.append(f"{ts} {u_txt}\n{ts} {r_txt}")
-                elif u_txt:
-                    dual_lines.append(f"{ts} {u_txt}")
-                elif r_txt:
-                    dual_lines.append(f"{ts} {r_txt}")
-            elif line.strip():
-                dual_lines.append(line.strip())
-
-        if dual_lines:
-            dual_text = "\n".join(dual_lines)
-            ordered_result = {
-                "dual": dual_text,
-                "urdu": result["urdu"],
-                "roman": result["roman"]
-            }
-            return ordered_result
-
     return result
 
 
-def _clean_search_query(raw):
-    """Strip YouTube/Spotify metadata junk and duplicate artist prefixes from filenames for lyrics search.
-    e.g. 'Abdul_Hannan_-_Haaray_Prod_by_Shahmeer_Raza_Khan_Official_Music_Video'
-    becomes 'Abdul Hannan Haaray'
-    """
-    if not raw:
-        return ""
-    s = raw.replace("_", " ").replace("\uff5c", " ").replace("|", " ")
-    # Remove bracketed/parenthesized content: [Official Video], (Prod. by X), etc.
-    s = re.sub(r"[\[\(][^\]\)]*[\]\)]", " ", s)
-    # Remove common YouTube/Spotify metadata keywords (case-insensitive)
-    noise_words = [
-        r"\bOfficial\s*Music\s*Video\b", r"\bOfficial\s*Lyric\s*Video\b",
-        r"\bOfficial\s*Audio\b", r"\bOfficial\s*Video\b", r"\bOfficial\b",
-        r"\bMusic\s*Video\b", r"\bLyric\s*Video\b", r"\b(?:Music|Lyric|Official)\s*Video\b", r"\bAudio\b",
-        r"\bVisuali[sz]er\b", r"\bLyrics?\b", r"\bFull\s*Song\b",
-        r"\bProd(?:\.|uced)?\s*(?:by)?\b", r"\bft\.?\b", r"\bfeat\.?\b",
-        r"\bHeartfelt\s*Breakup\s*Song\b"
-    ]
-    for nw in noise_words:
-        s = re.sub(nw, " ", s, flags=re.IGNORECASE)
-    # Collapse multiple dashes/spaces
-    s = re.sub(r"\s*-\s*-+\s*", " - ", s)
-    s = re.sub(r"\s{2,}", " ", s).strip()
-    # Deduplicate repeated words or word sequences (e.g. 'Abdul Hannan - Abdul Hannan' -> 'Abdul Hannan')
-    s = re.sub(r"\b([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)\s*-\s*\1\b", r"\1", s, flags=re.IGNORECASE)
-    s = re.sub(r"\b([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)\s+\1\b", r"\1", s, flags=re.IGNORECASE)
-    # Remove trailing/leading dash artifacts
-    s = re.sub(r"\s*-\s*$", "", s).strip()
-    s = re.sub(r"^\s*-\s*", "", s).strip()
-    s = re.sub(r"\s{2,}", " ", s).strip()
-    return s
-
-
-def fetch_lyrics_multi_provider(query, title=None, artist=None):
-    """4-stage cascade lyrics fetcher with direct fast LRCLIB query priority:
-    Stage 1: LRCLIB /api/get (direct high-speed exact match)
-    Stage 2: LRCLIB /api/search (direct high-speed fuzzy query)
-    Stage 3: syncedlyrics.search (multi-provider fallback)
-    Stage 4: Plain text fallback -> null/empty
-    """
-    clean_query = os.path.splitext(os.path.basename(query))[0] if query else ""
-
-    if not title and not artist and " - " in clean_query:
-        parts = clean_query.split(" - ", 1)
-        artist = _clean_search_query(parts[0])
-        title = _clean_search_query(parts[1])
-    elif not title and not artist:
-        # Try splitting on " - " inside underscored names too
-        normalized = clean_query.replace("_-_", " - ").replace("_", " ")
-        if " - " in normalized:
-            parts = normalized.split(" - ", 1)
-            artist = _clean_search_query(parts[0])
-            title = _clean_search_query(parts[1])
-
-    if title:
-        title = _clean_search_query(title)
-    if artist:
-        artist = _clean_search_query(artist)
-
-    # Deduplicate artist prefix from title if present
-    if artist and title and title.lower().startswith(artist.lower()):
-        title = title[len(artist):].strip()
-        title = re.sub(r"^[\s\-_:]+", "", title).strip()
-        title = _clean_search_query(title)
-
-    if not title:
-        title = _clean_search_query(clean_query)
-
-    search_term = f"{artist} {title}".strip() if artist and title else _clean_search_query(clean_query)
-    search_term = re.sub(r"\b([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)\s+\1\b", r"\1", search_term, flags=re.IGNORECASE)
-
-    plain_candidate = None
-
-    # Stage 1: Direct fast LRCLIB /api/get
-    if title:
-        try:
-            import requests
-            params = {"track_name": title}
-            if artist:
-                params["artist_name"] = artist
-            r = requests.get("https://lrclib.net/api/get", params=params, timeout=4, headers={"User-Agent": "AutoSongDownloader/1.0"})
-            if r.status_code == 200:
-                data = r.json()
-                synced = data.get("syncedLyrics")
-                plain = data.get("plainLyrics")
-                if synced and is_lrc_synced(synced):
-                    return {"lyrics": synced, "synced": True}
-                if plain and not plain_candidate:
-                    plain_candidate = plain
-        except Exception:
-            pass
-
-    # Stage 2: Direct fast LRCLIB /api/search
-    try:
-        import requests
-        params = {"q": search_term}
-        r = requests.get("https://lrclib.net/api/search", params=params, timeout=4, headers={"User-Agent": "AutoSongDownloader/1.0"})
-        if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, list):
-                for item in data:
-                    synced = item.get("syncedLyrics")
-                    if synced and is_lrc_synced(synced):
-                        return {"lyrics": synced, "synced": True}
-                    if not plain_candidate and item.get("plainLyrics"):
-                        plain_candidate = item.get("plainLyrics")
-    except Exception:
-        pass
-
-    # Stage 3: syncedlyrics search fallback
-    try:
-        import syncedlyrics
-        sl_res = syncedlyrics.search(search_term)
-        if sl_res and sl_res.strip():
-            if is_lrc_synced(sl_res):
-                return {"lyrics": sl_res, "synced": True}
-            elif not plain_candidate:
-                plain_candidate = sl_res
-    except Exception:
-        pass
-
-    # Stage 4: Plain text fallback -> null/empty
-    if plain_candidate and plain_candidate.strip():
-        return {"lyrics": plain_candidate, "synced": False}
-
-    return {"lyrics": None, "synced": False}
-
-
 def auto_fetch_and_save_lyrics(filename, title=None, uploader=None):
-    """Auto-fetch and save lyrics sidecar for a downloaded track."""
+    """Auto-fetch and save authentic lyrics sidecar for a downloaded track."""
     try:
         res = fetch_lyrics_multi_provider(filename, title=title, artist=uploader)
         lyrics = res.get("lyrics") if isinstance(res, dict) else res

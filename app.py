@@ -152,7 +152,7 @@ def api_get_lyrics():
         return jsonify({"status": "error", "error": "Filename or query parameter required"}), 400
 
     safe_filename = os.path.basename(filename)
-    stem = os.path.splitext(safe_filename)[0]
+    stem = download_song._safe_stem(safe_filename)
     dirs = download_song.get_dirs()
     lyrics_dir = dirs["lyrics"]
 
