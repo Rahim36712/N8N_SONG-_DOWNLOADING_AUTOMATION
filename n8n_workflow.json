@@ -4,7 +4,7 @@
     {
       "parameters": {
         "formTitle": "🎵 Song Downloader",
-        "formDescription": "Enter songs, YouTube URLs, YouTube playlists, or Spotify links — one per line.\nAll songs download in best quality MP3.",
+        "formDescription": "Enter songs, YouTube URLs, YouTube playlists, or Spotify links — one per line.\nDownloads concurrently via the local API.",
         "formFields": {
           "values": [
             {
@@ -26,30 +26,35 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json['Songs'];\nconst songs = raw.split('\\n').map(s => s.trim()).filter(s => s.length > 0);\nif (songs.length === 0) throw new Error('No input provided!');\nreturn songs.map((q, i) => ({ json: { query: q, index: i+1, total: songs.length } }));"
+        "jsCode": "const raw = $input.first().json['Songs'];\nconst songs = raw.split('\\n').map(s => s.trim()).filter(s => s.length > 0);\nif (songs.length === 0) throw new Error('No input provided!');\nreturn [{ json: { queries: songs } }];"
       },
       "id": "split-songs",
-      "name": "Split Input",
+      "name": "Collect Queries",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [250, 0]
     },
     {
       "parameters": {
-        "command": "=python C:\\Users\\RJ\\automation\\download_song.py \"{{ $json.query }}\" \"C:\\Users\\RJ\\Music\\AutoDownloads\""
+        "method": "POST",
+        "url": "http://127.0.0.1:5000/api/batch_download",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ queries: $json.queries, format: \"mp3\", quality: \"0\" }) }}",
+        "options": { "timeout": 600000 }
       },
-      "id": "execute-ytdlp",
-      "name": "Download",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "id": "http-batch",
+      "name": "Batch Download (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [500, 0]
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json.stdout;\nlet result;\ntry { result = JSON.parse(raw); }\ncatch(e) { return [{ json: { status:'parse_error', raw } }]; }\nconst prev = $('Split Input').item.json;\nresult.inputIndex = prev.index;\nresult.inputTotal = prev.total;\nresult.originalQuery = prev.query;\nreturn [{ json: result }];"
+        "jsCode": "const data = $input.first().json;\nconst results = data.results || [];\nconst summary = {\n  status: data.status,\n  total: results.length,\n  downloaded: results.filter(r => r.status === 'success').length,\n  skipped: results.filter(r => r.status === 'skipped').length,\n  failed: results.filter(r => r.status === 'error').length,\n  tracks: results.map(r => ({ query: r.query, title: r.title, status: r.status }))\n};\nreturn [{ json: summary }];"
       },
       "id": "parse-output",
-      "name": "Parse Result",
+      "name": "Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [750, 0]
@@ -57,15 +62,15 @@
   ],
   "connections": {
     "Form Trigger": {
-      "main": [[{ "node": "Split Input", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Collect Queries", "type": "main", "index": 0 }]]
     },
-    "Split Input": {
-      "main": [[{ "node": "Download", "type": "main", "index": 0 }]]
+    "Collect Queries": {
+      "main": [[{ "node": "Batch Download (API)", "type": "main", "index": 0 }]]
     },
-    "Download": {
-      "main": [[{ "node": "Parse Result", "type": "main", "index": 0 }]]
+    "Batch Download (API)": {
+      "main": [[{ "node": "Summary", "type": "main", "index": 0 }]]
     }
   },
   "settings": { "executionOrder": "v1" },
-  "meta": { "instanceId": "song-downloader-v3" }
+  "meta": { "instanceId": "song-downloader-v4" }
 }

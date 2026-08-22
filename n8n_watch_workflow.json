@@ -1,0 +1,79 @@
+{
+  "name": "Spotify Playlist Watcher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 30 }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5000/api/watch/sync",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ playlist_url: $vars.SPOTIFY_WATCH_URL || \"PASTE_YOUR_SPOTIFY_PLAYLIST_URL_HERE\" }) }}",
+        "options": { "timeout": 900000 }
+      },
+      "id": "http-watch-sync",
+      "name": "Sync Playlist (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.watch.downloaded }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-new",
+      "name": "New Tracks?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const w = $input.first().json.watch || {};\nconst lines = (w.new_tracks || []).map(t => `• ${t.title} — ${t.uploader}`).join('\\n');\nreturn [{ json: {\n  subject: `🎵 ${w.downloaded} new track(s) downloaded`,\n  body: `Playlist sync complete.\\nTotal in playlist: ${w.total}\\nAlready present: ${w.already_present}\\n\\nNew downloads:\\n${lines}`\n}}];"
+      },
+      "id": "build-notify",
+      "name": "Build Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, -100]
+    }
+  ],
+  "connections": {
+    "Every 30 min": {
+      "main": [[{ "node": "Sync Playlist (API)", "type": "main", "index": 0 }]]
+    },
+    "Sync Playlist (API)": {
+      "main": [[{ "node": "New Tracks?", "type": "main", "index": 0 }]]
+    },
+    "New Tracks?": {
+      "main": [
+        [{ "node": "Build Notification", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "song-downloader-watch-v1" }
+}

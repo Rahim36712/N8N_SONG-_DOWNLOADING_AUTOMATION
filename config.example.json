@@ -1,0 +1,23 @@
+{
+  "_comment": "Copy to config.json (gitignored) and edit. All keys optional; null/missing = built-in default.",
+
+  "music_dir": null,
+  "archive_file": null,
+  "log_file": null,
+  "lyrics_dir": null,
+  "db_file": null,
+
+  "max_workers": 4,
+  "default_format": "mp3",
+  "default_quality": "0",
+  "search_candidates": 8,
+
+  "auto_tag": true,
+  "auto_lyrics": true,
+
+  "loudnorm": false,
+  "loudnorm_i": -16,
+
+  "cookies_browser": null,
+  "spotify_watch_url": null
+}
