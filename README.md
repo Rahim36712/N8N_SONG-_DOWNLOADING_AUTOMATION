@@ -103,13 +103,25 @@ The Flask backend provides RESTful JSON endpoints for external integration:
 
 | Method | Endpoint | Description | Payload / Response |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/download` | Single track or playlist download | `{ "query": "Song or URL", "format": "mp3", "quality": "0" }` |
-| `POST` | `/api/batch_download` | Process multi-line batch download queue | `{ "queries": ["Song 1", "Song 2"], "format": "mp3" }` |
-| `GET` | `/api/library` | List all downloaded music files with metadata | `{ "status": "success", "library": [...] }` |
+| `POST` | `/api/download` | Single track or playlist download. Add `"mode":"async"` to queue it and get a `job_id` back instantly (202) | `{ "query": "Song or URL", "format": "mp3", "quality": "0" }` |
+| `POST` | `/api/batch_download` | Process multi-line batch queue **concurrently** | `{ "queries": ["Song 1", "Song 2"], "format": "mp3" }` |
+| `GET` | `/api/jobs` / `/api/jobs/<id>` | List jobs / poll one job's status & result | `{ "status": "success", "job": { "progress": 42, ... } }` |
+| `GET` | `/api/jobs/<id>/events` | Live SSE progress stream for a job | `text/event-stream` |
+| `POST` | `/api/jobs/<id>/cancel` | Cancel a queued/running job | — |
+| `GET` | `/api/library` | List all downloaded music files + play counts & durations | `{ "status": "success", "library": [...] }` |
+| `POST` | `/api/plays` | Increment a track's play count | `{ "filename": "Song.mp3" }` |
+| `GET`/`POST` | `/api/history` | Search history (list / record) | `{ "query": "..." }` |
+| `GET`/`POST` | `/api/playlists` | List / create playlists | `{ "name": "Mix", "tracks": ["a.mp3"] }` |
+| `GET` | `/api/playlists/<name>/export.m3u` | Export playlist as M3U | M3U file |
 | `GET` | `/api/stream/<filename>` | Stream audio file directly to browser | HTML5 Audio Stream (`audio/mpeg`, etc.) |
+| `GET`/`POST` | `/api/lyrics` | Synced lyrics (+ `?refresh=true`) | `{ "synced": true, "lyrics_by_lang": {...} }` |
+| `POST` | `/api/lyrics/generate` | Generate romanized / translated sidecars | `{ "filename": "Song.mp3", "translate": false }` |
+| `POST` | `/api/watch/sync` | Spotify playlist watcher: downloads only new tracks | `{ "playlist_url": "https://open.spotify.com/playlist/..." }` |
 | `POST` | `/api/open_folder` | Opens `AutoDownloads` in Windows File Explorer | `{ "status": "success", "message": "Opened folder" }` |
-| `GET` | `/api/system_info` | Get system status for Python, yt-dlp, FFmpeg | `{ "diagnostics": { "ffmpeg": "...", "total_files": 16 } }` |
+| `GET` | `/api/system_info` | System diagnostics incl. yt-dlp outdated hint | `{ "diagnostics": { "ffmpeg": "...", "total_files": 16 } }` |
 | `POST` | `/api/delete` | Delete a music file from disk | `{ "filename": "Song.mp3" }` |
+
+Optional `config.json` (see `config.example.json`) overrides paths, concurrency, auto-tagging, loudness normalization, browser-cookie fallback, and the watched Spotify playlist.
 
 ---
 
