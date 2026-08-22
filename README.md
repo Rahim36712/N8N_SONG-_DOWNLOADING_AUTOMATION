@@ -1,16 +1,16 @@
-# 🎵 Auto Song Downloader Pro & Music Hub
+# 🎵 AuraDisc Pro — Automated Song Downloader & Music Hub
 
 <div align="center">
 
-![Cool Yellow UI Banner](https://img.shields.io/badge/Design_Theme-Cool_Yellow_%26_Off--White-FACC15?style=for-the-badge&logoColor=0f172a)
-[![Python 3](https://img.shields.io/badge/Language-Python%203.14-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
+![Design Theme](https://img.shields.io/badge/Design_Theme-White_%26_Olive_Green-6B8E23?style=for-the-badge)
+[![Python 3](https://img.shields.io/badge/Language-Python%203.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
 [![Flask API](https://img.shields.io/badge/Framework-Flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![yt-dlp](https://img.shields.io/badge/Engine-yt--dlp-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://github.com/yt-dlp/yt-dlp)
-[![spotdl](https://img.shields.io/badge/Spotify-spotdl-1DB954?style=for-the-badge&logo=spotify&logoColor=white)](https://github.com/spotdl/spotify-downloader)
+[![Three.js](https://img.shields.io/badge/3D-Three.js_WebGL-000000?style=for-the-badge&logo=threedotjs&logoColor=white)](https://threejs.org/)
 [![n8n Orchestrator](https://img.shields.io/badge/Orchestrator-n8n-FF6F61?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/)
-[![Windows 11](https://img.shields.io/badge/OS-Windows%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://microsoft.com/)
+[![Windows](https://img.shields.io/badge/OS-Windows-0078D6?style=for-the-badge&logo=windows11&logoColor=white)](https://microsoft.com/)
 
-**An all-in-one, high-performance automated music downloader, local audio streaming player, library manager, and n8n automation pipeline.**
+**An all-in-one automated music downloader, WebGL streaming turntable, dual-language karaoke player, and n8n automation pipeline — for local use on Windows.**
 
 [Features](#-key-features) • [1-Click Launch](#-1-click-desktop-launch) • [Architecture](#-system-architecture) • [API Reference](#-api-reference) • [Setup](#-installation--setup)
 
@@ -20,35 +20,39 @@
 
 ## ✨ Key Features
 
-### 1. 🖥️ 1-Click Desktop Launcher
-- **Instant Browser Access**: Double-click the **Auto Song Downloader** icon generated directly on your Desktop (`Auto Song Downloader.lnk`).
-- **Silent Background Execution**: Runs silently via [`Start_Silent.vbs`](file:///d:/AI%20STUFF/PROJECTS/automated%20song%20downloader/Start_Silent.vbs) without leaving open terminal windows, automatically launching your default web browser to `http://127.0.0.1:5000`.
+### 1. 🎨 AuraDisc Pro Design System
+- **White base + olive green accents**, Comfortaa typography app-wide (Comfortaa Bold for karaoke lines, Noto Nastaliq Urdu for Urdu script).
+- **Real-time 3D turntable**: a WebGL disc rendered with Three.js and custom shaders — dark olive vinyl with micro-grooves, procedural hub label drawn from the playing track, spin easing, mouse-parallax tilt, and a glide transition when the track changes.
+- **Web Audio visualizer**: an orbital ring of ~900 particles reacts live to low/mid/high frequency bands.
+- Graceful CSS fallback disc when WebGL is unavailable; respects `prefers-reduced-motion`.
 
-### 2. 🎨 Cool Yellow & Off-White Design System
-- **State-of-the-Art Aesthetic**: Built with a **Sonic Yellow (`#FACC15`)** and **Off-White (`#FAF9F5`)** color palette.
-- **Glassmorphic Cards**: Pure white (`#FFFFFF`) containers with crisp border strokes, soft multi-layered shadows, and smooth micro-interactions.
+### 2. 🖥️ 1-Click Desktop Launcher
+- Double-click the **Auto Song Downloader** desktop icon (`Start_Silent.vbs`) — runs silently and opens `http://127.0.0.1:5000`.
 
-### 3. 🎧 In-Browser Audio Streaming & Player Widget
-- **Play Anywhere**: Listen to downloaded songs directly inside your browser without opening third-party media players.
-- **Floating Vinyl Bar**: Interactive audio bar complete with spinning vinyl disc animation, seek bar, time display, volume controls, and a 1-click **Close `(X)` Button** to stop playback and hide the player.
+### 3. ⚡ Downloads Engine
+- **Universal input**: YouTube videos/playlists, Spotify tracks/albums/playlists, YouTube Music links, and plain-text search queries.
+- **Async job queue**: downloads run in a thread pool; the UI streams live progress over **SSE** (`/api/jobs/<id>/events`) with one-click cancel.
+- **Smart source selection**: fetches the top 8 YouTube candidates and scores them (penalizes live/remix/sped-up variants, boosts official/topic channels, validates duration) before downloading.
+- **Robustness ladder**: automatic player-client cycling (`android/web → tv → mweb → ios`) with exponential backoff on transient errors; optional browser-cookie fallback via `config.json`.
+- **Spotify pipeline**: metadata with graceful fallbacks, proper `<artist> - <title>` naming, mutagen tagging (iTunes gap-fill), and dual YouTube+Spotify dedupe-archive keys.
+- **Format options**: MP3 320k · FLAC lossless · Hi-Res (96kHz/24-bit).
 
-### 4. 🎵 Music Library & Explorer Manager
-- **Live Search & Filter**: Instantly search your library by song title, artist, or file format.
-- **File Metadata & Tags**: Displays format tags (`MP3`, `FLAC`, `M4A`, `WAV`), file size in MB, and download dates.
-- **Open Downloads Folder Button**: Opens your local music destination (`C:\Users\RJ\Music\AutoDownloads`) directly in Windows File Explorer with one click.
-- **1-Click Track Deletion**: Cleanly delete tracks from disk directly from the Web UI.
+### 4. 🎤 Dual-Language Karaoke Lyrics
+- Synced `.lrc` playback with stacked **Urdu Nastaliq + English/Roman** lines, auto-scrolling highlight, click-to-seek, and an immersive fullscreen mode (`F`).
+- **Correctness-first engine v2**: synced LRC only; every candidate is hard-gated on **duration (±12 s vs the real audio file)** and title/artist token overlap; fuzzy search picks the *best-scored* match, never the first hit. No confident match → no lyrics (wrong subs are impossible rather than likely).
+- **Provenance & negative cache**: per-track source + timestamp in `.lyrics/.index.json`; unmatched tracks skip the network for 7 days.
+- **Rebuild tools**: 🧹 button wipes every sidecar and re-fetches in a background thread; per-track refresh icon re-fetches a single song. On-demand generators add romanized (offline transliteration) and English translation sidecars.
 
-### 5. ⚡ Multi-Source & Multi-Line Batch Queue
-- **Universal Input Support**: Handles YouTube video URLs, YouTube playlists, Spotify tracks/playlists, YouTube Music links, and plain text song search queries.
-- **Batch Queue Downloader**: Paste multiple URLs or titles line-by-line in the text area to process batch downloads concurrently.
-- **Concurrent Processing**: Multithreaded execution using Python `ThreadPoolExecutor` for fast multi-track downloading.
+### 5. 🎧 Library, Playlists & Player Extras
+- **SQLite-backed library** (`library.db`): play counts, durations, search history — filesystem stays the source of truth.
+- **Playlists**: build from selected tracks, filter the vault by playlist, export **M3U**.
+- **Player**: shuffle, repeat off/all/one, auto-fade between tracks, volume slider + mute, scrubber seeking.
+- **Keyboard shortcuts**: `Space` play/pause · `←/→` seek ±10 s · `↑/↓` volume · `N/P` next/prev · `F` fullscreen lyrics · `Esc` close.
+- **Media Session API**: Windows media keys and lock-screen controls work out of the box, artwork included.
 
-### 6. 📊 System Diagnostics Dashboard
-- **Health Diagnostics Tab**: Real-time status reporting for Python, yt-dlp, FFmpeg audio encoder, spotdl, total download count, and disk space usage.
-
-### 7. 🛡️ Duplicate Prevention & CSV Logging
-- **Smart Archive**: Uses a persistent archive file (`.downloaded.txt`) to avoid downloading identical songs twice.
-- **Transparent CSV Logs**: Appends every completed task to `download_log.csv` with timestamps, file size, artist name, and file path.
+### 6. 🛡️ Housekeeping
+- Persistent dedupe archive (`.downloaded.txt`) prevents double downloads; serialized CSV logging.
+- System diagnostics endpoint incl. an "yt-dlp outdated" hint when PyPI is newer than the installed copy.
 
 ---
 
@@ -57,93 +61,92 @@
 ```mermaid
 flowchart TD
     subgraph Client ["Client Interfaces"]
-        A1["🖥️ Desktop Shortcut\n(Auto Song Downloader.lnk)"] --> B1["🤫 Start_Silent.vbs\n(Silent Launcher)"]
+        A1["🖥️ Desktop Shortcut"] --> B1["🤫 Start_Silent.vbs"]
         A2["🌐 Web Browser\n(http://127.0.0.1:5000)"]
-        A3["🤖 n8n Workflow Form\n(Webhook Orchestrator)"]
+        A3["🤖 n8n Workflows\n(batch form + playlist watcher)"]
     end
 
     subgraph Backend ["Python & Flask Backend"]
-        B1 --> C1["⚡ app.py Server\n(Flask Web App & REST APIs)"]
+        B1 --> C1["⚡ app.py\n(Flask server, REST APIs, SSE)"]
         A2 <--> C1
-        A3 <--> C2["⚙️ download_song.py\n(yt-dlp + spotdl Engine)"]
-        C1 <--> C2
+        A3 <--> C1
+        C1 <--> C2["⚙️ download_song.py\n(yt-dlp Python API + Spotify pipeline)\n+ validated lyrics engine v2"]
     end
 
-    subgraph Storage ["Local Storage & Engines"]
-        C2 --> D1["🎵 Music Library\n(C:\\Users\\RJ\\Music\\AutoDownloads)"]
-        C2 --> D2["🛡️ Download Archive\n(.downloaded.txt)"]
-        C2 --> D3["📊 Download Log\n(download_log.csv)"]
+    subgraph Storage ["Local Storage"]
+        C2 --> D1["🎵 ~/Music/AutoDownloads"]
+        C2 --> D2["🛡️ .downloaded.txt archive"]
+        C2 --> D3["📊 download_log.csv"]
+        C2 --> D4["🗃️ library.db + .lyrics/ sidecars"]
     end
 
-    style A1 fill:#FACC15,stroke:#0F172A,stroke-width:2px,color:#0F172A
-    style B1 fill:#F59E0B,stroke:#0F172A,stroke-width:2px,color:#0F172A
-    style C1 fill:#6366F1,stroke:#fff,stroke-width:2px,color:#fff
-    style C2 fill:#3B82F6,stroke:#fff,stroke-width:2px,color:#fff
-    style D1 fill:#10B981,stroke:#fff,stroke-width:2px,color:#fff
+    style C1 fill:#6B8E23,stroke:#fff,color:#fff
+    style C2 fill:#4A6516,stroke:#fff,color:#fff
+    style D1 fill:#93B23F,stroke:#fff,color:#2C331D
 ```
 
 ---
 
 ## 🚀 1-Click Desktop Launch
 
-Simply double-click the **Auto Song Downloader** icon on your Desktop!
+Double-click the **Auto Song Downloader** desktop icon. To re-create the shortcut:
 
-- **Target Script**: [`Start_Silent.vbs`](file:///d:/AI%20STUFF/PROJECTS/automated%20song%20downloader/Start_Silent.vbs)
-- **Batch Launcher**: [`Start Downloader.bat`](file:///d:/AI%20STUFF/PROJECTS/automated%20song%20downloader/Start%20Downloader.bat)
-- **Re-create Desktop Shortcut**:
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File "Create_Desktop_Shortcut.ps1"
-  ```
+```powershell
+powershell -ExecutionPolicy Bypass -File "Create_Desktop_Shortcut.ps1"
+```
+
+Launchers: [`Start_Silent.vbs`](Start_Silent.vbs) (silent + browser open) and [`Start Downloader.bat`](<Start Downloader.bat>) (visible console).
 
 ---
 
 ## 📡 API Reference
 
-The Flask backend provides RESTful JSON endpoints for external integration:
-
 | Method | Endpoint | Description | Payload / Response |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/download` | Single track or playlist download. Add `"mode":"async"` to queue it and get a `job_id` back instantly (202) | `{ "query": "Song or URL", "format": "mp3", "quality": "0" }` |
-| `POST` | `/api/batch_download` | Process multi-line batch queue **concurrently** | `{ "queries": ["Song 1", "Song 2"], "format": "mp3" }` |
-| `GET` | `/api/jobs` / `/api/jobs/<id>` | List jobs / poll one job's status & result | `{ "status": "success", "job": { "progress": 42, ... } }` |
-| `GET` | `/api/jobs/<id>/events` | Live SSE progress stream for a job | `text/event-stream` |
-| `POST` | `/api/jobs/<id>/cancel` | Cancel a queued/running job | — |
-| `GET` | `/api/library` | List all downloaded music files + play counts & durations | `{ "status": "success", "library": [...] }` |
-| `POST` | `/api/plays` | Increment a track's play count | `{ "filename": "Song.mp3" }` |
-| `GET`/`POST` | `/api/history` | Search history (list / record) | `{ "query": "..." }` |
+| `POST` | `/api/download` | Single track/playlist download. `"mode":"async"` returns `{job_id}` (202) instantly | `{ "query": "...", "format": "mp3", "quality": "0" }` |
+| `POST` | `/api/batch_download` | Concurrent multi-query batch | `{ "queries": [...], "format": "mp3" }` |
+| `GET` | `/api/jobs` / `/api/jobs/<id>` | Job list / poll one job | `{ "job": { "progress": 42, ... } }` |
+| `GET` | `/api/jobs/<id>/events` | Live SSE progress stream | `text/event-stream` |
+| `POST` | `/api/jobs/<id>/cancel` | Cancel queued/running job | — |
+| `GET` | `/api/library` | Vault listing (+ play counts, durations) | `{ "status": "success", "library": [...] }` |
+| `POST` | `/api/plays` | Increment play count | `{ "filename": "Song.mp3" }` |
+| `GET`/`POST` | `/api/history` | Search history | `{ "query": "..." }` |
 | `GET`/`POST` | `/api/playlists` | List / create playlists | `{ "name": "Mix", "tracks": ["a.mp3"] }` |
-| `GET` | `/api/playlists/<name>/export.m3u` | Export playlist as M3U | M3U file |
-| `GET` | `/api/stream/<filename>` | Stream audio file directly to browser | HTML5 Audio Stream (`audio/mpeg`, etc.) |
-| `GET`/`POST` | `/api/lyrics` | Synced lyrics (+ `?refresh=true`) | `{ "synced": true, "lyrics_by_lang": {...} }` |
-| `POST` | `/api/lyrics/generate` | Generate romanized / translated sidecars | `{ "filename": "Song.mp3", "translate": false }` |
-| `POST` | `/api/watch/sync` | Spotify playlist watcher: downloads only new tracks | `{ "playlist_url": "https://open.spotify.com/playlist/..." }` |
-| `POST` | `/api/open_folder` | Opens `AutoDownloads` in Windows File Explorer | `{ "status": "success", "message": "Opened folder" }` |
-| `GET` | `/api/system_info` | System diagnostics incl. yt-dlp outdated hint | `{ "diagnostics": { "ffmpeg": "...", "total_files": 16 } }` |
-| `POST` | `/api/delete` | Delete a music file from disk | `{ "filename": "Song.mp3" }` |
+| `GET` | `/api/playlists/<name>/export.m3u` | Export M3U | M3U file |
+| `GET` | `/api/stream/<filename>` | Stream audio to browser | HTML5 Audio stream |
+| `GET`/`POST` | `/api/lyrics` | Synced lyrics (+`?refresh=true` re-fetches one track) | `{ "synced": true, "lyrics_by_lang": {...} }` |
+| `POST` | `/api/lyrics/generate` | Generate romanized/translated sidecars | `{ "filename": "Song.mp3", "translate": false }` |
+| `POST` | `/api/lyrics/refresh` | Orphan purge + reindex; `{"purge_all":true}` = wipe ALL lyrics and rebuild in background | `{ "purge_all": true }` |
+| `POST` | `/api/watch/sync` | Watched-playlist sync: downloads only new tracks | `{ "playlist_url": "..." }` |
+| `POST` | `/api/open_folder` | Open music folder in Explorer | — |
+| `GET` | `/api/system_info` | Diagnostics incl. yt-dlp outdated hint | `{ "diagnostics": {...} }` |
+| `POST` | `/api/delete` | Delete a track from disk | `{ "filename": "Song.mp3" }` |
 
-Optional `config.json` (see `config.example.json`) overrides paths, concurrency, auto-tagging, loudness normalization, browser-cookie fallback, and the watched Spotify playlist.
+Optional `config.json` (see [`config.example.json`](config.example.json)) overrides paths, concurrency, auto-tagging/lyrics toggles, loudness normalization, browser-cookie fallback, and the watched Spotify playlist.
 
 ---
 
 ## ⚙️ Installation & Setup
 
-### 1. Automated Setup Script
-Run PowerShell as **Administrator** inside this project directory:
+### 1. Automated setup (Windows, admin PowerShell)
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\setup.ps1
 ```
-This script automatically:
-- Checks Python and installs required packages (`yt-dlp`, `spotdl`, `flask`).
-- Checks Node.js and installs `n8n` globally.
-- Installs `FFmpeg` via `winget`.
-- Configures environment variables and output directories.
+Installs Python deps, FFmpeg (winget), and n8n.
 
-### 2. Manual Server Startup
-```bash
-python app.py
+### 2. Manual
+```powershell
+pip install -r requirements.txt
+python app.py            # -> http://127.0.0.1:5000
 ```
-Open `http://127.0.0.1:5000` in your web browser.
+
+### 3. Tests
+```powershell
+python -m pytest tests/ -q   # lyric matcher unit tests (no network)
+```
+
+> Tip: if extraction errors appear after YouTube changes, upgrade first: `yt-dlp -U` (or `pip install -U yt-dlp`).
 
 ---
 
@@ -151,30 +154,32 @@ Open `http://127.0.0.1:5000` in your web browser.
 
 ```
 AUTOMATION-SONG/
-├── app.py                      # Flask Server, REST APIs, & Streaming Engine
-├── download_song.py            # Core Media Extraction Engine (yt-dlp + spotdl)
-├── Create_Desktop_Shortcut.ps1 # PowerShell Desktop Shortcut Generator
-├── Start_Silent.vbs            # Silent Background Window Launcher
-├── Start Downloader.bat        # Command Launcher Script
-├── setup.ps1                   # Automated Setup & Dependency Installer
-├── n8n_workflow.json           # n8n Orchestrator Workflow import file
-├── README.md                   # Application Documentation
-└── templates/
-    └── index.html              # Cool Yellow & Off-White Frontend Interface
+├── app.py                       # Flask server, REST APIs, async jobs, SSE
+├── download_song.py             # yt-dlp/Spotify engine + validated lyrics engine v2
+├── tests/
+│   └── test_lyric_matching.py   # Unit tests for filename parsing & candidate gating
+├── templates/
+│   └── index.html               # AuraDisc Pro frontend (Tailwind CDN + Three.js)
+├── n8n_workflow.json            # Batch download form workflow
+├── n8n_watch_workflow.json      # Cron playlist-watcher workflow
+├── config.example.json          # Template for optional config.json overrides
+├── setup.ps1                    # Automated dependency installer
+├── Create_Desktop_Shortcut.ps1  # Shortcut generator
+├── Start_Silent.vbs / Start Downloader.bat
+├── AGENTS.md                    # Contributor/agent guide (commands, architecture facts)
+└── README.md
 ```
 
 ---
 
 ## 📝 Technologies Used
-* **Frontend**: HTML5, CSS3 Vanilla Glassmorphism, JavaScript ES6+
-* **Backend API**: Python 3.14, Flask
-* **Media Extraction**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) & [spotdl](https://github.com/spotdl/spotify-downloader)
-* **Audio Encoder**: FFmpeg
-* **Automation Orchestrator**: [n8n](https://n8n.io/)
-* **Operating System**: Windows 11
+- **Frontend**: Tailwind CSS (Play CDN), vanilla JS, **Three.js r128** (WebGL turntable), **Web Audio API** (FFT visualizer), Comfortaa + Noto Nastaliq Urdu fonts
+- **Backend**: Python 3.10+, Flask, yt-dlp (in-process API), spotipy/mutagen, SQLite, ThreadPoolExecutor
+- **Lyrics**: LRCLIB (primary), Musixmatch/NetEase via syncedlyrics (fallback), offline romanizer + Google-translate sidecar generator
+- **Automation**: [n8n](https://n8n.io/) workflows (batch form + cron watch/sync)
 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ for Seamless Music Downloading & Local Streaming.</sub>
+  <sub>Built for seamless music downloading, streaming, and singing along.</sub>
 </div>
