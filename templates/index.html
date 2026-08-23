@@ -6,16 +6,15 @@
           autoReplaceSvg: 'nest'
         };
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Fully offline: every vendor asset is self-hosted from /static -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuraDisc Pro — Player</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="/static/fonts/fonts.css">
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+    <script src="/static/vendor/tailwind.js"></script>
+    <script src="/static/vendor/three.min.js"></script>
+    <script src="/static/vendor/fontawesome/js/all.min.js"></script>
     <script>
     tailwind.config = {
       theme: { extend: {
@@ -59,14 +58,16 @@
     .lyric-row:hover{opacity:1}
     .lyric-row.active{opacity:1}
     .lyric-u{display:block;font-weight:700;color:#9aa38b;font-size:clamp(1.3rem,2.3vw,1.85rem);line-height:1.45;transition:color .25s ease,transform .25s ease;transform-origin:left center;}
-    .lyric-u.font-urdu{line-height:2.1;font-size:clamp(1.25rem,2.2vw,1.7rem);}
+    /* Nastaliq glyphs tower far outside the Latin em-box — tall line boxes prevent clipping */
+    .lyric-u.font-urdu{line-height:2.4;font-size:clamp(1.25rem,2.2vw,1.7rem);padding:.15rem 0;}
     .lyric-row.active .lyric-u{color:#262c18;transform:scale(1.02);}
     .lyric-e{display:block;margin-top:.1rem;font-weight:600;font-size:clamp(.82rem,1.3vw,1.05rem);color:#98a089;transition:color .25s ease;}
     .lyric-row.active .lyric-e{color:#4a6516;}
-    #fs-lyrics-stream .lyric-u{font-size:clamp(1.7rem,3.6vw,2.9rem);}
-    #fs-lyrics-stream .lyric-u.font-urdu{font-size:clamp(1.6rem,3.4vw,2.7rem);}
+    #lyrics-stream,#fs-lyrics-stream{scroll-padding-block:3rem;}
+    #fs-lyrics-stream .lyric-u{font-size:clamp(1.7rem,3.6vw,2.9rem);line-height:1.9;}
+    #fs-lyrics-stream .lyric-u.font-urdu{font-size:clamp(1.6rem,3.4vw,2.7rem);line-height:2.6;padding:.25rem 0;}
     #fs-lyrics-stream .lyric-e{font-size:clamp(.95rem,1.8vw,1.25rem);}
-    #fs-lyrics-stream .lyric-row{padding:.6rem .5rem;}
+    #fs-lyrics-stream .lyric-row{padding:.7rem .5rem;}
     .scrub-track{background:rgba(44,51,29,.12);cursor:pointer;}
     .scrub-fill{background:linear-gradient(90deg,#93b23f,#4a6516);box-shadow:0 0 10px rgba(107,142,35,.55);}
     .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
@@ -212,7 +213,7 @@
           </button>
         </div>
       </div>
-      <div id="lyrics-stream" class="h-[340px] sm:h-[440px] xl:h-[500px] overflow-y-auto pr-1 sm:pr-3">
+      <div id="lyrics-stream" class="h-[340px] sm:h-[440px] xl:h-[500px] overflow-y-auto py-5 pr-1 sm:pr-3">
         <div class="py-16 text-center text-sm text-app-muted">Select a song to display synchronized dual-language subtitles</div>
       </div>
       <div id="lyrics-footer" class="mt-5 pt-4 border-t border-app-line flex items-center justify-between text-[11px] text-app-muted">
@@ -286,7 +287,7 @@
   </div>
 
   <!-- Giant Cinema-Grade Synced Lyrics Stream (Spotify-style, left-aligned) -->
-  <div id="fs-lyrics-stream" class="relative z-10 flex-1 overflow-y-auto px-6 sm:px-12 space-y-8 sm:space-y-10 text-left no-scrollbar max-w-3xl w-full mx-auto" style="padding-top: 26vh; padding-bottom: 40vh;">
+  <div id="fs-lyrics-stream" class="relative z-10 flex-1 overflow-y-auto px-6 sm:px-12 space-y-8 sm:space-y-10 text-left no-scrollbar max-w-3xl w-full mx-auto" style="padding-top: 26vh; padding-bottom: 46vh;">
     <div class="py-24 text-center text-sm text-app-muted">Select a song to start karaoke</div>
   </div>
 
