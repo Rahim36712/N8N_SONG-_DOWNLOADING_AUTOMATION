@@ -16,6 +16,7 @@ import tempfile
 import traceback
 import uuid
 import re
+import difflib
 import sqlite3
 import concurrent.futures
 import urllib.request
@@ -737,77 +738,275 @@ def _archive_add(dirs, key):
         pass
 
 
-def score_candidate(info, expected_duration=None):
-    """A3 heuristic score for a YouTube search candidate. Higher is better."""
+def _normalize_song_name(s):
+    """Normalize song title or artist: strip bracketed info, promotional noise,
+    repeated letters/vowels, and clean whitespace.
+    """
+    if not s:
+        return ""
+    s = str(s).lower()
+    s = re.sub(r'\[[^\]]*\]', ' ', s)
+    s = re.sub(r'\([^\)]*\)', ' ', s)
+    noise = [
+        r'\bofficial\s*music\s*video\b', r'\bofficial\s*lyric\s*video\b',
+        r'\bofficial\s*audio\b', r'\bofficial\s*video\b', r'\bofficial\b',
+        r'\bmusic\s*video\b', r'\blyric\s*video\b', r'\bvideo\b', r'\baudio\b',
+        r'\bvisuali[sz]er\b', r'\blyrics?\b', r'\bfull\s*song\b',
+        r'\bprod(?:\.|uced)?\s*(?:by)?\s*[\w\s]+\b', r'\bft\.?\s*[\w\s]+\b', r'\bfeat\.?\s*[\w\s]+\b',
+    ]
+    for n in noise:
+        s = re.sub(n, ' ', s, flags=re.IGNORECASE)
+    s = re.sub(r'([aeiou])\1+', r'\1', s)
+    s = s.replace('jaa', 'ja').replace('mein', 'me').replace('main', 'me').replace('yeh', 'ye')
+    return s.strip()
+
+
+def _clean_tokens_fuzzy(s):
+    norm = _normalize_song_name(s)
+    return set(re.findall(r'[a-z0-9\u0600-\u06FF]+', norm))
+
+
+def _token_fuzzy_match(t1, t2):
+    if t1 == t2:
+        return True
+    if len(t1) >= 4 and len(t2) >= 4:
+        return difflib.SequenceMatcher(None, t1, t2).ratio() >= 0.80
+    return False
+
+
+def _token_overlap_smart(a, b):
+    """Smart token overlap with transliteration normalization and fuzzy token tolerance."""
+    ta, tb = _clean_tokens_fuzzy(a), _clean_tokens_fuzzy(b)
+    if not ta or not tb:
+        return 0.0
+    matched = 0
+    tb_remaining = set(tb)
+    for token_a in ta:
+        found = None
+        for token_b in tb_remaining:
+            if _token_fuzzy_match(token_a, token_b):
+                found = token_b
+                break
+        if found:
+            matched += 1
+            tb_remaining.remove(found)
+    return matched / min(len(ta), len(tb))
+
+
+def lookup_itunes_enriched(query):
+    """Fast, lightweight search on iTunes API to resolve canonical track name, artist, duration,
+    and artwork for spelling/alias correction. Times out in 3 seconds.
+    """
+    if not query or not str(query).strip():
+        return None
+    q_str = str(query).strip()
+    if is_url(q_str):
+        return None
+    try:
+        url = f"https://itunes.apple.com/search?term={urllib.parse.quote(q_str)}&entity=song&limit=3"
+        r = requests.get(url, timeout=3)
+        if r.status_code == 200:
+            res = (r.json() or {}).get("results") or []
+            for it in res:
+                t_name = it.get("trackName") or ""
+                a_name = it.get("artistName") or ""
+                sim = max(_token_overlap_smart(q_str, t_name),
+                          _token_overlap_smart(q_str, f"{t_name} {a_name}"))
+                if sim >= 0.5:
+                    dur_ms = it.get("trackTimeMillis") or 0
+                    art = it.get("artworkUrl100") or ""
+                    return {
+                        "title": t_name,
+                        "artist": a_name,
+                        "duration": int(dur_ms / 1000) if dur_ms else None,
+                        "cover_url": art.replace("100x100bb", "600x600bb") if art else None,
+                        "source": "itunes"
+                    }
+    except Exception:
+        pass
+    return None
+
+
+def score_candidate(info, expected_duration=None, target_title=None, target_artist=None, query=None):
+    """A3 + Hybrid candidate scorer. Higher is better.
+    Enforces a hard title gate (rejects unrelated songs), rewards title and artist matches,
+    boosts official YouTube Music Topic tracks, and adapts duration tolerance for music videos.
+    """
     score = 0.0
-    title = (info.get("title") or "").lower()
-    uploader = (info.get("uploader") or info.get("channel") or "").lower()
+    c_title = info.get("title") or ""
+    c_uploader = (info.get("uploader") or info.get("channel") or "").lower()
+    c_dur = info.get("duration") or 0
+    c_views = info.get("view_count") or 0
 
+    # If target title not given, infer from query
+    if not target_title and query and not is_url(query):
+        inferred_artist, inferred_title = extract_artist_and_title(query)
+        target_title = inferred_title or query
+        if not target_artist:
+            target_artist = inferred_artist
+
+    c_artist, c_song_title = extract_artist_and_title(c_title)
+
+    # 1. Title Similarity & Hard Gate
+    if target_title:
+        norm_target = _normalize_song_name(target_title)
+        norm_c_title = _normalize_song_name(c_title)
+        norm_c_song = _normalize_song_name(c_song_title)
+
+        title_sim = max(
+            _token_overlap_smart(target_title, c_song_title or c_title),
+            _token_overlap_smart(target_title, c_title)
+        )
+        if norm_target and (norm_target in norm_c_title or norm_target in norm_c_song):
+            title_sim = max(title_sim, 0.95)
+
+        # Hard Gate: if title overlap is too low and no substring containment, disqualify!
+        if norm_target and title_sim < 0.35 and norm_target not in norm_c_title:
+            return -1000.0  # Disqualifies unrelated viral hits (e.g. Bikhra, Qasmein)
+
+        score += 50.0 * title_sim
+        if title_sim >= 0.90:
+            score += 25.0
+
+    # 2. Artist Similarity
+    if target_artist:
+        artist_sim = max(
+            _token_overlap_smart(target_artist, c_artist),
+            _token_overlap_smart(target_artist, c_uploader)
+        )
+        score += 20.0 * artist_sim
+
+    # 3. Channel & Source Quality
+    is_topic = c_uploader.endswith("- topic")
+    if is_topic:
+        score += 35.0   # Highest priority: official YouTube Music audio stream
+    elif "vevo" in c_uploader:
+        score += 20.0
+    elif "official" in c_uploader:
+        score += 10.0
+
+    # 4. Negative Keywords
+    norm_target_lower = _normalize_song_name(target_title).lower() if target_title else ""
     for kw in BAD_TITLE_KEYWORDS:
-        if kw in title:
-            score -= 15
+        if kw in c_title.lower() and (not norm_target_lower or kw not in norm_target_lower):
+            score -= 25.0
 
-    if uploader.endswith("- topic"):
-        score += 25
-    elif "vevo" in uploader:
-        score += 20
-    elif "official" in uploader:
-        score += 8
-
-    duration = info.get("duration") or 0
-    if expected_duration:
-        if duration and abs(duration - expected_duration) <= expected_duration * 0.10:
-            score += 30
-        elif duration:
-            score -= min(25, abs(duration - expected_duration) / max(expected_duration, 1) * 100)
+    # 5. Adaptive Duration
+    if expected_duration and c_dur:
+        diff = abs(c_dur - expected_duration)
+        if is_topic:
+            if diff <= 10:
+                score += 30.0
+            else:
+                score -= min(30.0, diff * 2.0)
+        else:
+            # Music video: relax penalty if title is strong match (cinematic intros/outros)
+            if diff <= 12:
+                score += 25.0
+            elif diff <= 50 and target_title and _token_overlap_smart(target_title, c_title) >= 0.70:
+                score += 15.0
+            elif diff <= 85 and target_title and _token_overlap_smart(target_title, c_title) >= 0.70:
+                score += 5.0
+            else:
+                score -= min(35.0, (diff / max(expected_duration, 1)) * 40.0)
     else:
-        if duration and duration > 900:   # >15min likely mix/compilation
-            score -= 20
-        if duration and duration < 30:    # likely preview/short
-            score -= 15
+        if c_dur and c_dur > 900:   # >15min mix
+            score -= 20.0
+        if c_dur and c_dur < 30:    # <30s short
+            score -= 15.0
 
-    views = info.get("view_count") or 0
-    score += min(15, views / 100000)
+    # 6. Tie-breaker View Count (capped at 5 points max so views never defeat title match)
+    score += min(5.0, c_views / 1000000.0)
+
     return score
 
 
-def search_best_candidate(query, expected_duration=None, max_candidates=None):
-    """A3 smart source selection: fetch ytsearchN candidates (flat, cheap) and pick the best.
-
-    Returns {"url","title","uploader","duration","view_count","score"} or None on failure.
+def search_best_candidate(query, expected_duration=None, max_candidates=None,
+                          target_title=None, target_artist=None):
+    """A3 smart source selection with Hybrid Option A:
+    1. If target_title and target_artist exist, first search YouTube for Topic / Official Audio.
+    2. If a matching candidate scores >= 65.0, pick it immediately.
+    3. Otherwise, search general ytsearchN with strict title gating.
     """
     if max_candidates is None:
-        max_candidates = int(load_config().get("search_candidates") or 8)
-    cmd = [
-        "yt-dlp", "--dump-json", "--flat-playlist", "--no-playlist",
-        "--socket-timeout", "15",
-        f"ytsearch{max_candidates}:{query}",
-    ]
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=60)
-    except Exception:
-        return None
-    if r.returncode != 0 or not r.stdout:
-        return None
+        max_candidates = int(load_config().get("search_candidates") or 6)
 
-    candidates = []
-    for line in r.stdout.splitlines():
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
+    # Infer target_title & target_artist if not provided
+    if not target_title and query and not is_url(query):
+        inferred_artist, inferred_title = extract_artist_and_title(query)
+        target_title = inferred_title or query
+        if not target_artist:
+            target_artist = inferred_artist
+
+    def _fetch_candidates(search_query, count):
+        cmd = [
+            "yt-dlp", "--dump-json", "--flat-playlist", "--no-playlist",
+            "--socket-timeout", "15",
+            f"ytsearch{count}:{search_query}",
+        ]
         try:
-            candidates.append(json.loads(line))
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=90)
         except Exception:
-            continue
+            return []
+        if r.returncode != 0 or not r.stdout:
+            return []
+        cands = []
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                cands.append(json.loads(line))
+            except Exception:
+                continue
+        return cands
+
+    # Stage 1: If structured title & artist, search for Topic / Official Audio first
+    if target_title and target_artist:
+        topic_query = f"{target_title} {target_artist} Topic"
+        stage1_candidates = _fetch_candidates(topic_query, min(max_candidates, 4))
+        if stage1_candidates:
+            b1, b1_score = None, float("-inf")
+            for c in stage1_candidates:
+                s = score_candidate(c, expected_duration=expected_duration,
+                                    target_title=target_title, target_artist=target_artist)
+                if s > b1_score:
+                    b1, b1_score = c, s
+            if b1 and b1_score >= 65.0:
+                url = b1.get("url") or b1.get("webpage_url")
+                if url:
+                    if not str(url).startswith("http"):
+                        url = f"https://www.youtube.com/watch?v={url}"
+                    return {
+                        "url": url,
+                        "title": b1.get("title") or "",
+                        "uploader": b1.get("uploader") or b1.get("channel") or "",
+                        "duration": b1.get("duration"),
+                        "view_count": b1.get("view_count"),
+                        "score": round(b1_score, 1),
+                    }
+
+    # Stage 2: Standard search with full candidate scoring
+    search_str = f"{target_title} {target_artist}".strip() if (target_title and target_artist) else query
+    candidates = _fetch_candidates(search_str, max_candidates)
+    if not candidates and search_str != query:
+        candidates = _fetch_candidates(query, max_candidates)
+
     if not candidates:
         return None
 
     best, best_score = None, float("-inf")
     for c in candidates:
-        s = score_candidate(c, expected_duration)
+        s = score_candidate(c, expected_duration=expected_duration,
+                            target_title=target_title, target_artist=target_artist,
+                            query=query)
         if s > best_score:
             best, best_score = c, s
+
+    if not best or best_score <= -500.0:
+        best = candidates[0]
+        best_score = 0.0
 
     url = best.get("url") or best.get("webpage_url")
     if not url:
@@ -828,6 +1027,10 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
                     client_set=None, cookies_browser=None, progress_cb=None,
                     cancel_check=None):
     """B2: shared YoutubeDL options builder (replaces CLI flag assembly)."""
+    target_codec = "flac" if str(audio_format).lower() in ("bluray", "blu-ray", "hires") else audio_format
+    if target_codec not in ("mp3", "flac", "m4a", "wav", "opus", "aac", "vorbis", "alac"):
+        target_codec = "mp3"
+
     opts = {
         "quiet": True,
         "no_warnings": False,
@@ -842,7 +1045,7 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
         "retries": 3,
         "js_runtimes": {"node": {}},
         "postprocessors": [
-            {"key": "FFmpegExtractAudio", "preferredcodec": audio_format, "preferredquality": audio_quality},
+            {"key": "FFmpegExtractAudio", "preferredcodec": target_codec, "preferredquality": audio_quality},
             {"key": "EmbedThumbnail"},
             {"key": "FFmpegMetadata"},
         ],
@@ -851,13 +1054,22 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
         opts["extractor_args"] = {"youtube": {"player_client": client_set.split(",")}}
     if cookies_browser:
         opts["cookiesfrombrowser"] = (cookies_browser,)
+
+    ffmpeg_args = []
+    if str(audio_format).lower() in ("bluray", "blu-ray", "hires"):
+        ffmpeg_args.extend(["-sample_fmt", "s32", "-ar", "96000"])
+
     cfg = load_config()
     if cfg.get("loudnorm"):
         # C6: EBU R128 loudness normalization applied during audio extraction
         i_lufs = cfg.get("loudnorm_i", -16)
+        ffmpeg_args.extend(["-af", f"loudnorm=I={i_lufs}:TP=-1.5:LRA=11"])
+
+    if ffmpeg_args:
         opts["postprocessor_args"] = {
-            "ExtractAudio": ["-af", f"loudnorm=I={i_lufs}:TP=-1.5:LRA=11"]
+            "ExtractAudio": ffmpeg_args
         }
+
     if progress_cb or cancel_check:
         def _hook(d):
             if cancel_check is not None and cancel_check():
@@ -881,7 +1093,8 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
 
 
 def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="0",
-                    progress_cb=None, cancel_check=None, expected_duration=None):
+                    progress_cb=None, cancel_check=None, expected_duration=None,
+                    target_title=None, target_artist=None):
     """Download a single song by name or URL using the yt-dlp Python API (B2).
 
     Robustness layers: A3 smart source selection, A2 player-client cycling with
@@ -894,9 +1107,20 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
     target = query
     picked = None
     if not is_url(query):
-        picked = search_best_candidate(query, expected_duration=expected_duration)
+        # Try iTunes canonical enrichment if target_title is not explicitly provided
+        if not target_title:
+            enriched = lookup_itunes_enriched(query)
+            if enriched:
+                target_title = enriched.get("title")
+                target_artist = target_artist or enriched.get("artist")
+                expected_duration = expected_duration or enriched.get("duration")
+
+        picked = search_best_candidate(query, expected_duration=expected_duration,
+                                       target_title=target_title, target_artist=target_artist)
         if picked:
             target = picked["url"]
+        else:
+            target = f"ytsearch1:{query}"
 
     # Cheap archive pre-check for direct video URLs
     vid = _extract_video_id(target)
@@ -926,6 +1150,11 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
             try:
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     info = ydl.extract_info(target, download=True)
+
+                if info and "entries" in info:
+                    entries = [e for e in (info.get("entries") or []) if e]
+                    if entries:
+                        info = entries[0]
 
                 req = (info or {}).get("requested_downloads") or []
                 fpath = req[0].get("filepath") if req else None
@@ -1062,13 +1291,25 @@ def _get_spotify_client():
 
 
 def _spotify_kind_id(url):
-    m = re.search(r"open\.spotify\.com/(?:intl-[a-z]{2}/)?(track|album|playlist)/([A-Za-z0-9]+)", url or "")
+    if not url:
+        return (None, None)
+    raw = str(url).strip()
+    if "spotify.link" in raw or "spotify.app.link" in raw:
+        try:
+            r = requests.head(raw, allow_redirects=True, timeout=5)
+            raw = r.url
+        except Exception:
+            pass
+    m_uri = re.search(r"spotify:(track|album|playlist):([A-Za-z0-9]+)", raw)
+    if m_uri:
+        return (m_uri.group(1), m_uri.group(2))
+    m = re.search(r"open\.spotify\.com/(?:intl-[a-z]{2}/)?(?:embed/)?(?:user/[^/]+/)?(track|album|playlist)/([A-Za-z0-9]+)", raw)
     return (m.group(1), m.group(2)) if m else (None, None)
 
 
 def _embed_spotify_data(kind, eid):
     r = requests.get(f"https://open.spotify.com/embed/{kind}/{eid}", timeout=10,
-                     headers={"User-Agent": "Mozilla/5.0"})
+                     headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
     m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', r.text, re.S)
     if not m:
         return None
@@ -1116,12 +1357,14 @@ def _spotify_tracks_via_embed(kind, eid):
     if not data:
         raise RuntimeError("Could not load Spotify data (no-auth scrape failed)")
     ent = data.get("entity") or {}
+    covers = (ent.get("coverArt") or {}).get("sources") or []
+    cover_url = covers[0].get("url") if covers else None
     tracks = []
 
-    def _norm(tid, title, artist, duration_ms):
+    def _norm(tid, title, artist, duration_ms, t_cover=None):
         return {
-            "id": tid, "title": title, "artist": artist or "", "album": None,
-            "duration_ms": duration_ms or 0, "cover_url": None,
+            "id": tid, "title": title, "artist": artist or "", "album": ent.get("name") if kind == "album" else None,
+            "duration_ms": duration_ms or 0, "cover_url": t_cover or cover_url,
             "release_date": ((ent.get("releaseDate") or {}).get("isoString") or "")[:10] or None,
             "track_number": None,
         }
@@ -1129,11 +1372,11 @@ def _spotify_tracks_via_embed(kind, eid):
     if kind == "track":
         artists = ", ".join(a.get("name") for a in (ent.get("artists") or []) if a.get("name"))
         tracks.append(_norm(ent.get("id") or eid, ent.get("name") or ent.get("title"),
-                            artists, ent.get("duration")))
+                            artists, ent.get("duration"), cover_url))
     else:
         for t in (ent.get("trackList") or []):
             tid = (t.get("uri") or "").split(":")[-1]
-            tracks.append(_norm(tid, t.get("title"), t.get("subtitle"), t.get("duration")))
+            tracks.append(_norm(tid, t.get("title"), t.get("subtitle"), t.get("duration"), cover_url))
 
     tracks = [t for t in tracks if t.get("id") and t.get("title")]
     if not tracks:
@@ -1164,6 +1407,348 @@ def get_spotify_tracks(spotify_url):
             ex.shutdown(wait=False)
 
     return _spotify_tracks_via_embed(kind, eid), "embed"
+
+
+def get_playlist_preview(url):
+    """Resolve a Spotify playlist/album or YouTube playlist URL into preview metadata."""
+    if not url:
+        return {"status": "error", "error": "No URL provided"}
+
+    raw = str(url).strip()
+    if is_spotify(raw):
+        kind, eid = _spotify_kind_id(raw)
+        if not eid:
+            return {"status": "error", "error": f"Invalid Spotify URL: {raw}"}
+
+        # Embed scrape first (fast, authless)
+        try:
+            data = _embed_spotify_data(kind, eid)
+            if data:
+                ent = data.get("entity") or {}
+                title = ent.get("title") or ent.get("name") or f"Spotify {kind.capitalize()}"
+                subtitle = ent.get("subtitle") or (ent.get("owner") or {}).get("name") or ""
+                covers = (ent.get("coverArt") or {}).get("sources") or []
+                cover_url = covers[0].get("url") if covers else None
+
+                tracks = []
+                if kind == "track":
+                    artists = ", ".join(a.get("name") for a in (ent.get("artists") or []) if a.get("name")) or subtitle
+                    dur_ms = ent.get("duration") or 0
+                    m = int(dur_ms / 1000 // 60)
+                    s = int(dur_ms / 1000 % 60)
+                    tracks.append({
+                        "id": ent.get("id") or eid,
+                        "title": ent.get("name") or ent.get("title") or "Track",
+                        "artist": artists,
+                        "duration_ms": dur_ms,
+                        "duration_fmt": f"{m:02d}:{s:02d}",
+                        "cover_url": cover_url,
+                        "available_formats": ["mp3", "flac", "bluray"],
+                        "default_format": "bluray",
+                    })
+                else:
+                    for idx, t in enumerate(ent.get("trackList") or []):
+                        tid = (t.get("uri") or "").split(":")[-1] or f"t_{idx}"
+                        dur_ms = t.get("duration") or 0
+                        m = int(dur_ms / 1000 // 60)
+                        s = int(dur_ms / 1000 % 60)
+                        tracks.append({
+                            "id": tid,
+                            "title": t.get("title") or f"Track {idx+1}",
+                            "artist": t.get("subtitle") or subtitle or "Unknown Artist",
+                            "duration_ms": dur_ms,
+                            "duration_fmt": f"{m:02d}:{s:02d}",
+                            "cover_url": cover_url,
+                            "available_formats": ["mp3", "flac", "bluray"],
+                            "default_format": "bluray",
+                        })
+
+                if tracks:
+                    return {
+                        "status": "success",
+                        "source": "spotify",
+                        "type": kind,
+                        "id": eid,
+                        "title": title,
+                        "subtitle": subtitle,
+                        "cover_url": cover_url,
+                        "total": len(tracks),
+                        "tracks": tracks
+                    }
+        except Exception as e:
+            print(f"Spotify embed preview fallback triggered ({e})", file=sys.stderr)
+
+        # Fallback to get_spotify_tracks
+        try:
+            raw_tracks, src = get_spotify_tracks(raw)
+            tracks = []
+            for idx, t in enumerate(raw_tracks):
+                dur_ms = t.get("duration_ms") or 0
+                m = int(dur_ms / 1000 // 60)
+                s = int(dur_ms / 1000 % 60)
+                tracks.append({
+                    "id": t.get("id") or str(idx),
+                    "title": t.get("title"),
+                    "artist": t.get("artist"),
+                    "duration_ms": dur_ms,
+                    "duration_fmt": f"{m:02d}:{s:02d}",
+                    "cover_url": t.get("cover_url"),
+                    "available_formats": ["mp3", "flac", "bluray"],
+                    "default_format": "bluray",
+                })
+            return {
+                "status": "success",
+                "source": "spotify",
+                "type": kind,
+                "id": eid,
+                "title": f"Spotify {kind.capitalize()}",
+                "subtitle": "",
+                "cover_url": tracks[0].get("cover_url") if tracks else None,
+                "total": len(tracks),
+                "tracks": tracks
+            }
+        except Exception as e:
+            return {"status": "error", "error": f"Failed to load Spotify playlist: {e}"}
+
+    elif is_yt_playlist(raw):
+        try:
+            ydl_opts = {
+                "extract_flat": "in_playlist",
+                "quiet": True,
+                "no_warnings": True,
+                "socket_timeout": 15,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(raw, download=False)
+            entries = (info or {}).get("entries") or []
+            tracks = []
+            for idx, entry in enumerate(entries):
+                dur_sec = entry.get("duration") or 0
+                m = int(dur_sec // 60)
+                s = int(dur_sec % 60)
+                tracks.append({
+                    "id": entry.get("id") or str(idx),
+                    "url": entry.get("url") or f"https://www.youtube.com/watch?v={entry.get('id')}",
+                    "title": entry.get("title") or f"Track {idx+1}",
+                    "artist": entry.get("uploader") or entry.get("channel") or "",
+                    "duration_ms": int(dur_sec * 1000),
+                    "duration_fmt": f"{m:02d}:{s:02d}",
+                    "cover_url": (entry.get("thumbnails") or [{}])[-1].get("url") if entry.get("thumbnails") else None,
+                    "available_formats": ["mp3", "flac", "bluray"],
+                    "default_format": "bluray",
+                })
+            return {
+                "status": "success",
+                "source": "youtube",
+                "type": "playlist",
+                "title": (info or {}).get("title") or "YouTube Playlist",
+                "subtitle": (info or {}).get("uploader") or (info or {}).get("channel") or "",
+                "cover_url": (info or {}).get("thumbnail") or (tracks[0].get("cover_url") if tracks else None),
+                "total": len(tracks),
+                "tracks": tracks
+            }
+        except Exception as e:
+            return {"status": "error", "error": f"Failed to load YouTube playlist: {e}"}
+
+    return {"status": "error", "error": "URL is not a recognized playlist URL"}
+
+
+def get_track_preview(query):
+    """Resolve a single song query, YouTube URL, or Spotify track URL into preview metadata
+    and dynamic audio format availability.
+    """
+    if not query or not str(query).strip():
+        return {"status": "error", "error": "No song query or URL provided"}
+
+    raw = str(query).strip()
+
+    # 1. Spotify track or single-track album check
+    if is_spotify(raw):
+        kind, eid = _spotify_kind_id(raw)
+        if eid and (kind == "track" or kind == "album"):
+            try:
+                data = _embed_spotify_data(kind, eid)
+                if data:
+                    ent = data.get("entity") or {}
+                    title = None
+                    artists = None
+                    cover_url = None
+                    dur_sec = None
+
+                    if kind == "track":
+                        title = ent.get("name") or ent.get("title") or "Spotify Track"
+                        artists = ", ".join(a.get("name") for a in (ent.get("artists") or []) if a.get("name")) or "Unknown Artist"
+                        covers = (ent.get("coverArt") or {}).get("sources") or []
+                        cover_url = covers[0].get("url") if covers else None
+                        dur_ms = ent.get("duration") or 0
+                        dur_sec = int(dur_ms / 1000)
+                    elif kind == "album":
+                        trackList = ent.get("trackList") or []
+                        if len(trackList) == 1:
+                            t0 = trackList[0]
+                            title = t0.get("title") or ent.get("name") or "Spotify Track"
+                            artists = t0.get("subtitle") or ", ".join(a.get("name") for a in (ent.get("artists") or []) if a.get("name")) or "Unknown Artist"
+                            covers = (ent.get("coverArt") or {}).get("sources") or []
+                            cover_url = covers[0].get("url") if covers else None
+                            dur_ms = t0.get("duration") or 0
+                            dur_sec = int(dur_ms / 1000)
+
+                    if title and artists:
+                        # Find best YouTube counterpart with strict title and artist matching
+                        yt_query = f"{artists} {title}".strip()
+                        picked = search_best_candidate(yt_query, expected_duration=dur_sec,
+                                                       target_title=title, target_artist=artists)
+                        yt_url = picked["url"] if picked else f"ytsearch1:{yt_query}"
+
+                        # Inspect audio formats via yt-dlp
+                        return _inspect_track_formats(yt_url,
+                                                      fallback_title=title,
+                                                      fallback_artist=artists,
+                                                      fallback_cover=cover_url,
+                                                      fallback_dur=dur_sec,
+                                                      source="spotify",
+                                                      original_query=raw)
+            except Exception as e:
+                print(f"Spotify preview error: {e}", file=sys.stderr)
+
+    # 2. Text query or YouTube URL
+    target = raw
+    picked = None
+    enriched_title = None
+    enriched_artist = None
+    enriched_cover = None
+    enriched_dur = None
+
+    if not is_url(raw):
+        enriched = lookup_itunes_enriched(raw)
+        if enriched:
+            enriched_title = enriched.get("title")
+            enriched_artist = enriched.get("artist")
+            enriched_cover = enriched.get("cover_url")
+            enriched_dur = enriched.get("duration")
+
+        picked = search_best_candidate(raw, expected_duration=enriched_dur,
+                                       target_title=enriched_title,
+                                       target_artist=enriched_artist)
+        if picked:
+            target = picked["url"]
+        else:
+            target = f"ytsearch1:{raw}"
+
+    return _inspect_track_formats(target,
+                                  fallback_title=enriched_title or (picked or {}).get("title"),
+                                  fallback_artist=enriched_artist or (picked or {}).get("uploader"),
+                                  fallback_cover=enriched_cover,
+                                  fallback_dur=enriched_dur or (picked or {}).get("duration"),
+                                  source="youtube",
+                                  original_query=raw)
+
+
+def _inspect_track_formats(target, fallback_title=None, fallback_artist=None,
+                           fallback_cover=None, fallback_dur=None,
+                           source="youtube", original_query=None):
+    ydl_opts = {
+        "extract_flat": False,
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 15,
+    }
+    info = None
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(target, download=False)
+        if info and "entries" in info:
+            entries = [e for e in (info.get("entries") or []) if e]
+            if entries:
+                info = entries[0]
+    except Exception as e:
+        print(f"Format inspection extraction warning: {e}", file=sys.stderr)
+
+    title = (info or {}).get("title") or fallback_title or original_query or "Unknown Song"
+    artist = (info or {}).get("uploader") or (info or {}).get("channel") or fallback_artist or "Unknown Artist"
+    duration = (info or {}).get("duration") or fallback_dur or 0
+    cover_url = (info or {}).get("thumbnail") or fallback_cover or ((info or {}).get("thumbnails") or [{}])[-1].get("url")
+    webpage_url = (info or {}).get("webpage_url") or (info or {}).get("url") or target
+
+    # Check stream audio formats
+    formats = (info or {}).get("formats") or []
+    audio_formats = [f for f in formats if f.get("acodec") != "none" or f.get("vcodec") == "none"]
+    abrs = [f.get("abr") for f in audio_formats if f.get("abr")]
+    asrs = [f.get("asr") for f in audio_formats if f.get("asr")]
+
+    max_abr = max(abrs) if abrs else 128.0
+    max_asr = max(asrs) if asrs else 44100
+
+    # Format availability rules (as confirmed in user design interview):
+    # MP3: universally encodable at 320k CBR
+    is_mp3 = True
+    # FLAC: Lossless bit-perfect encode
+    is_flac = max_abr >= 60.0
+    # BluRay Hi-Res: Studio grade 24-bit 96kHz requires high-bitrate source audio (>= 150kbps)
+    is_bluray = max_abr >= 150.0
+
+    dur_sec = duration or 0
+    m = int(dur_sec // 60)
+    s = int(dur_sec % 60)
+    dur_fmt = f"{m:02d}:{s:02d}" if dur_sec > 0 else "—"
+
+    available_formats = []
+    if is_bluray:
+        available_formats.append("bluray")
+    if is_flac:
+        available_formats.append("flac")
+    if is_mp3:
+        available_formats.append("mp3")
+
+    default_format = "bluray" if is_bluray else ("flac" if is_flac else "mp3")
+
+    formats_info = [
+        {
+            "id": "bluray",
+            "name": "BluRay Hi-Res Audio",
+            "sub": "24-bit / 96kHz Studio Master",
+            "badge": "Studio Master 96k/24b",
+            "available": is_bluray,
+            "est_size": f"~{round(dur_sec * 2300 / 8 / 1024, 1)} MB" if dur_sec else "~40-60 MB",
+            "reason": "" if is_bluray else f"Source audio is below 160kbps ({round(max_abr)}kbps)"
+        },
+        {
+            "id": "flac",
+            "name": "FLAC Lossless",
+            "sub": "Bit-perfect Lossless (16-bit / 44.1kHz)",
+            "badge": "Audiophile Lossless",
+            "available": is_flac,
+            "est_size": f"~{round(dur_sec * 850 / 8 / 1024, 1)} MB" if dur_sec else "~15-25 MB",
+            "reason": "" if is_flac else f"Source audio is below 60kbps ({round(max_abr)}kbps)"
+        },
+        {
+            "id": "mp3",
+            "name": "MP3 320k",
+            "sub": "Universal Compatibility (320kbps CBR)",
+            "badge": "Universal MP3",
+            "available": is_mp3,
+            "est_size": f"~{round(dur_sec * 320 / 8 / 1024, 1)} MB" if dur_sec else "~5-10 MB",
+            "reason": ""
+        }
+    ]
+
+    return {
+        "status": "success",
+        "query": original_query or target,
+        "url": webpage_url,
+        "title": title,
+        "artist": artist,
+        "duration": dur_sec,
+        "duration_fmt": dur_fmt,
+        "cover_url": cover_url,
+        "source": source,
+        "max_abr": round(max_abr, 1),
+        "max_asr": max_asr,
+        "available_formats": available_formats,
+        "default_format": default_format,
+        "formats": formats_info
+    }
 
 
 def lookup_itunes(artist, title):
@@ -1325,7 +1910,9 @@ def handle_spotify(spotify_url, output_dir, dirs, audio_format="mp3", audio_qual
         expected = (track.get("duration_ms") or 0) / 1000.0
         query = f"{track['artist']} {track['title']}".strip()
         res = download_single(query, output_dir, dirs, audio_format, audio_quality,
-                              expected_duration=expected)
+                              expected_duration=expected,
+                              target_title=track.get("title"),
+                              target_artist=track.get("artist"))
 
         if res.get("status") == "success":
             # Consistent naming from Spotify metadata
@@ -1476,45 +2063,6 @@ def _handle_spotify_legacy(spotify_url, output_dir, dirs, audio_format="mp3", au
     return {"status": "playlist_done", "source": "spotify", "engine": "spotdl",
             "total": ok, "downloaded": ok, "results": results}
 
-
-def get_track_preview(query):
-    """Fetch quick metadata preview via the yt-dlp Python API with smart-search fallback."""
-    if is_url(query):
-        targets = [query]
-    else:
-        best = search_best_candidate(query)
-        targets = [best["url"]] if best else [f"ytsearch1:{query}"]
-
-    opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
-        "socket_timeout": 15,
-        "js_runtimes": {"node": {}},
-        "extractor_args": {"youtube": {"player_client": PLAYER_CLIENT_CYCLE[0].split(",")}},
-    }
-    for t in targets:
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                data = ydl.extract_info(t, download=False)
-            if not data:
-                continue
-            duration_sec = data.get("duration", 0) or 0
-            mins, secs = divmod(int(duration_sec), 60)
-            return {
-                "status": "success",
-                "title": data.get("title", query),
-                "uploader": data.get("uploader") or data.get("artist") or "Unknown",
-                "thumbnail": data.get("thumbnail", ""),
-                "duration": f"{mins}:{secs:02d}",
-                "url": data.get("webpage_url", query),
-                "views": data.get("view_count", 0),
-                "engine": "yt-dlp"
-            }
-        except Exception:
-            continue
-
-    return {"status": "error", "message": "Could not fetch preview metadata"}
 
 
 def get_music_library(dirs):

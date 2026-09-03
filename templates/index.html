@@ -25,51 +25,71 @@
         },
         colors: {
           app: {
-            bg:'#f7f8f2',
+            /* Theme tokens are CSS variables (RGB triplets) — switched live by the retro theme picker */
+            bg:'rgb(var(--t-bg) / <alpha-value>)',
             panel:'rgba(255,255,255,0.66)',
-            line:'rgba(90,108,58,0.16)',
-            ink:'#2c331d',
-            muted:'#79816a',
-            olive:'#6b8e23',
-            oliveDeep:'#4a6516',
-            oliveSoft:'#93b23f'
+            line:'rgb(var(--t-accent-deep) / 0.16)',
+            ink:'rgb(var(--t-ink) / <alpha-value>)',
+            muted:'rgb(var(--t-ink) / 0.47)',
+            olive:'rgb(var(--t-accent) / <alpha-value>)',
+            oliveDeep:'rgb(var(--t-accent-deep) / <alpha-value>)',
+            oliveSoft:'rgb(var(--t-accent-soft) / <alpha-value>)'
           }
         }
       } }
     }
     </script>
     <style>
-    body{background:radial-gradient(120% 100% at 50% 0%,#ffffff 0%,#f5f7ec 52%,#eaefdb 100%);color:#2c331d;font-feature-settings:"tnum";min-height:100vh;}
-    ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(107,142,35,.30);border-radius:10px}
-    ::-webkit-scrollbar-thumb:hover{background:rgba(107,142,35,.55)}
-    .glass-card{background:rgba(255,255,255,.62);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(90,108,58,.15);box-shadow:0 20px 60px -26px rgba(74,101,22,.35), inset 0 1px 0 rgba(255,255,255,.9);}
-    .olive-glow{box-shadow:0 0 12px rgba(107,142,35,.45);}
-    .olive-text-glow{text-shadow:0 0 14px rgba(107,142,35,.5), 0 0 30px rgba(107,142,35,.22);}
+    /* Theme tokens (RGB triplets) — default Olive Grove, switched live by the retro theme picker */
+    :root{--t-bg:247 248 242;--t-bg-2:245 247 236;--t-bg-3:234 239 219;--t-accent:107 142 35;--t-accent-deep:74 101 22;--t-accent-soft:147 178 63;--t-ink:44 51 29;}
+    body{background:radial-gradient(120% 100% at 50% 0%,#ffffff 0%,rgb(var(--t-bg-2)) 52%,rgb(var(--t-bg-3)) 100%);color:rgb(var(--t-ink));font-feature-settings:"tnum";min-height:100vh;}
+    ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgb(var(--t-accent)/.30);border-radius:10px}
+    ::-webkit-scrollbar-thumb:hover{background:rgb(var(--t-accent)/.55)}
+    .glass-card{background:rgba(255,255,255,.72);border:1px solid rgb(var(--t-accent-deep)/.15);box-shadow:0 20px 60px -26px rgb(var(--t-accent-deep)/.35), inset 0 1px 0 rgba(255,255,255,.9);}
+    /* backdrop blur reserved for tiny floating popovers — too costly on large cards */
+    .glass-blur{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}
+    /* off-screen vault rows skip layout/paint */
+    .row-cv{content-visibility:auto;contain-intrinsic-size:auto 72px;}
+    .olive-glow{box-shadow:0 0 12px rgb(var(--t-accent)/.45);}
+    .olive-text-glow{text-shadow:0 0 14px rgb(var(--t-accent)/.5), 0 0 30px rgb(var(--t-accent)/.22);}
     .disc-spin{animation:spin 9s linear infinite}
     .disc-paused{animation-play-state:paused !important}
     @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
     @keyframes pulse-ring{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.18);opacity:0}}
     .viz-ring{animation:pulse-ring 3.2s ease-out infinite}
     .pulse-dot{position:relative}
-    .pulse-dot::after{content:'';position:absolute;inset:-4px;border-radius:9999px;background:rgba(107,142,35,.45);animation:pulse-olive 1.8s infinite}
-    @keyframes pulse-olive{0%{box-shadow:0 0 0 0 rgba(107,142,35,.55)}70%{box-shadow:0 0 0 10px rgba(107,142,35,0)}100%{box-shadow:0 0 0 0 rgba(107,142,35,0)}}
-    .lyric-row{padding:.45rem .35rem;border-radius:14px;cursor:pointer;transition:opacity .25s ease;}
-    .lyric-row:not(.active){opacity:.65}
-    .lyric-row:hover{opacity:1}
+    .pulse-dot::after{content:'';position:absolute;inset:-4px;border-radius:9999px;background:rgb(var(--t-accent)/.45);animation:pulse-olive 1.8s infinite}
+    @keyframes pulse-olive{0%{box-shadow:0 0 0 0 rgb(var(--t-accent)/.55)}70%{box-shadow:0 0 0 10px rgb(var(--t-accent)/0)}100%{box-shadow:0 0 0 0 rgb(var(--t-accent)/0)}}
+    .lyric-row{padding:.6rem .5rem;border-radius:18px;cursor:pointer;transition:opacity .25s ease;}
+    .lyric-row:not(.active){opacity:.55}
+    .lyric-row:hover{opacity:.95}
     .lyric-row.active{opacity:1}
-    .lyric-u{display:block;font-weight:700;color:#9aa38b;font-size:clamp(1.3rem,2.3vw,1.85rem);line-height:1.45;transition:color .25s ease,transform .25s ease;transform-origin:left center;}
+    /* English lines pinned to extreme leftmost edge, Urdu lines pinned to extreme rightmost edge */
+    .lyric-row.urdu{text-align:right;}
+    .lyric-row.eng{text-align:left;}
+    .lyric-u{display:block;font-weight:900;color:rgb(var(--t-ink)/.55);font-size:clamp(1.4rem,2.5vw,2.1rem);line-height:1.45;transition:color .25s ease,transform .25s ease;transform-origin:left center;-webkit-text-stroke:1.1px currentColor;paint-order:stroke fill;}
     /* Nastaliq glyphs tower far outside the Latin em-box — tall line boxes prevent clipping */
-    .lyric-u.font-urdu{line-height:2.4;font-size:clamp(1.25rem,2.2vw,1.7rem);padding:.15rem 0;}
-    .lyric-row.active .lyric-u{color:#262c18;transform:scale(1.02);}
-    .lyric-e{display:block;margin-top:.1rem;font-weight:600;font-size:clamp(.82rem,1.3vw,1.05rem);color:#98a089;transition:color .25s ease;}
-    .lyric-row.active .lyric-e{color:#4a6516;}
+    .lyric-u.font-urdu{line-height:2.5;font-weight:700;font-size:clamp(1.35rem,2.4vw,1.9rem);padding:.2rem 0;-webkit-text-stroke:.85px currentColor;}
+    .lyric-row.active .lyric-u{color:rgb(var(--t-ink));transform:scale(1.025);-webkit-text-stroke:1.3px currentColor;}
+    .lyric-row.active .lyric-u.font-urdu{-webkit-text-stroke:1.0px currentColor;}
+    .lyric-row.urdu .lyric-u{transform-origin:right center}
+    .lyric-e{display:block;margin-top:.25rem;font-weight:800;font-size:clamp(.9rem,1.4vw,1.15rem);color:rgb(var(--t-ink)/.50);transition:color .25s ease;-webkit-text-stroke:.75px currentColor;paint-order:stroke fill;}
+    .lyric-row.active .lyric-e{color:rgb(var(--t-accent-deep));font-weight:900;-webkit-text-stroke:.95px currentColor;}
     #lyrics-stream,#fs-lyrics-stream{scroll-padding-block:3rem;}
-    #fs-lyrics-stream .lyric-u{font-size:clamp(1.7rem,3.6vw,2.9rem);line-height:1.9;}
-    #fs-lyrics-stream .lyric-u.font-urdu{font-size:clamp(1.6rem,3.4vw,2.7rem);line-height:2.6;padding:.25rem 0;}
-    #fs-lyrics-stream .lyric-e{font-size:clamp(.95rem,1.8vw,1.25rem);}
-    #fs-lyrics-stream .lyric-row{padding:.7rem .5rem;}
-    .scrub-track{background:rgba(44,51,29,.12);cursor:pointer;}
-    .scrub-fill{background:linear-gradient(90deg,#93b23f,#4a6516);box-shadow:0 0 10px rgba(107,142,35,.55);}
+    #fs-lyrics-stream .lyric-u{font-size:clamp(1.85rem,4.0vw,3.2rem);line-height:1.9;font-weight:900;-webkit-text-stroke:1.5px currentColor;}
+    #fs-lyrics-stream .lyric-u.font-urdu{font-size:clamp(1.75rem,3.8vw,3.0rem);line-height:2.7;font-weight:700;-webkit-text-stroke:1.15px currentColor;padding:.3rem 0;}
+    #fs-lyrics-stream .lyric-e{font-size:clamp(1.05rem,2.0vw,1.4rem);font-weight:800;-webkit-text-stroke:.9px currentColor;}
+    #fs-lyrics-stream .lyric-row{padding:.9rem .75rem;width:100%;}
+    #fs-lyrics-stream .lyric-row.eng{padding-left:1.5rem;padding-right:0.5rem;text-align:left;}
+    #fs-lyrics-stream .lyric-row.urdu{padding-right:1.5rem;padding-left:0.5rem;text-align:right;}
+    #fs-lyrics-stream .lyric-row.dual{padding-left:1.5rem;padding-right:1.5rem;}
+    .scrub-track{background:rgb(var(--t-ink)/.12);cursor:pointer;}
+    .scrub-fill{background:linear-gradient(90deg,rgb(var(--t-accent-soft)),rgb(var(--t-accent-deep)));box-shadow:0 0 10px rgb(var(--t-accent)/.55);}
+    /* Soft theme-aware ambient glows (converted from fixed rgba utilities) */
+    .stage-glow-a{background:radial-gradient(circle at 50% 42%,rgb(var(--t-accent-soft)/.18) 0%,transparent 55%);}
+    .fs-vignette{background:radial-gradient(ellipse at 50% 40%,rgb(var(--t-accent)/.14) 0%,transparent 70%);}
+    .np-glow{background:radial-gradient(circle,rgb(var(--t-accent)/.30) 0%,transparent 70%);}
+    .play-glow{box-shadow:0 0 34px rgb(var(--t-accent)/.5);}
     .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
     .no-scrollbar::-webkit-scrollbar{display:none}
     #webgl-stage{display:block;width:100%;height:100%;border-radius:9999px;}
@@ -81,12 +101,15 @@
     }
     </style>
 </head>
-<body class="w-full antialiased selection:bg-app-olive selection:text-white overflow-x-hidden pb-12">
+<body class="w-full antialiased selection:bg-app-olive selection:text-white overflow-x-hidden pb-12 relative">
+
+<!-- Animated WebGL Mesh Drift Shader Background Canvas -->
+<canvas id="bg-mesh-drift" class="fixed inset-0 w-full h-full pointer-events-none -z-10"></canvas>
 
 <!-- Hidden Audio Element -->
 <audio id="audio-player" preload="auto"></audio>
 
-<div class="w-full min-h-[1100px] px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-6 max-w-[1700px] mx-auto" id="app-root">
+<div class="w-full min-h-[1100px] px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-6 max-w-[1700px] mx-auto relative z-10" id="app-root">
 
   <!-- A. TOP FLOATING HERO COMMAND BAR -->
   <header id="header" class="w-full">
@@ -94,18 +117,11 @@
 
       <!-- Search & Download Input -->
       <div id="search-fetch" class="flex-1 flex items-center gap-2 bg-app-ink/[0.04] border border-app-line rounded-full pl-5 pr-1.5 py-1.5 focus-within:border-app-olive/50 transition min-w-0">
-        <span class="pulse-dot"><i class="fa-solid fa-link text-app-olive text-sm"></i></span>
-        <input type="text" id="url-input" class="bg-transparent outline-none text-sm text-app-ink placeholder-app-muted w-full font-medium tracking-wide min-w-0" placeholder="Paste YouTube / Spotify track or playlist URL...">
-        <button id="paste-fetch-btn" class="shrink-0 h-10 px-4 rounded-full bg-app-olive text-white text-xs font-semibold hover:bg-app-oliveDeep transition flex items-center gap-2 whitespace-nowrap active:scale-95">
+        <span class="pulse-dot"><i class="fa-solid fa-magnifying-glass text-app-olive text-sm"></i></span>
+        <input type="text" id="url-input" class="bg-transparent outline-none text-sm text-app-ink placeholder-app-muted w-full font-medium tracking-wide min-w-0" placeholder="Search song title or paste YouTube / Spotify URL...">
+        <button id="paste-fetch-btn" class="shrink-0 h-10 px-4 rounded-full bg-app-olive text-white text-xs font-semibold hover:bg-app-oliveDeep transition flex items-center gap-2 whitespace-nowrap active:scale-95 cursor-pointer">
           <i class="fa-regular fa-clipboard"></i><span class="hidden sm:inline">Paste &amp; Fetch</span>
         </button>
-      </div>
-
-      <!-- Format & Quality Selectors -->
-      <div id="format-selector" class="glass-card !bg-white/50 rounded-full p-1 flex items-center text-[11px] sm:text-xs overflow-x-auto no-scrollbar shrink-0">
-        <button data-format="mp3" data-quality="0" class="format-btn px-3 sm:px-4 py-2.5 rounded-full text-app-muted hover:text-app-ink transition whitespace-nowrap">MP3 320k</button>
-        <button data-format="flac" data-quality="0" class="format-btn px-3 sm:px-4 py-2.5 rounded-full text-app-muted hover:text-app-ink transition whitespace-nowrap">FLAC Lossless</button>
-        <button data-format="bluray" data-quality="0" class="format-btn active px-3 sm:px-4 py-2.5 rounded-full border border-app-olive olive-glow bg-app-olive/15 text-app-ink font-semibold whitespace-nowrap">BluRay Hi-Res Audio (96kHz/24-bit)</button>
       </div>
 
       <!-- Live Telemetry Meter -->
@@ -115,16 +131,37 @@
         <span class="text-app-muted">•</span>
         <span id="telemetry-stat" class="text-app-ink font-semibold">0 tracks in vault</span>
       </div>
+
+      <!-- Download Center Button -->
+      <button id="open-dl-modal-btn" onclick="toggleDownloadModal(true)" title="Open Download Center" class="glass-card !bg-white/50 rounded-full px-3.5 py-2.5 flex items-center gap-2 text-[11px] sm:text-xs font-semibold text-app-olive hover:text-app-ink hover:!bg-white transition shrink-0 active:scale-95">
+        <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
+        <span class="hidden xl:inline">Downloads</span>
+        <span id="header-dl-badge" class="hidden px-1.5 py-0.2 rounded-full bg-app-olive text-white text-[10px] font-mono font-bold">0</span>
+      </button>
+
+      <!-- Retro Theme Picker -->
+      <div class="relative shrink-0">
+        <button id="theme-btn" title="Retro themes" class="glass-card !bg-white/50 rounded-full w-[42px] h-[42px] flex items-center justify-center text-app-olive hover:text-app-ink hover:!bg-white transition">
+          <i class="fa-solid fa-palette text-sm"></i>
+        </button>
+        <div id="theme-menu" class="hidden absolute right-0 top-full mt-2 w-56 glass-card glass-blur rounded-2xl p-2 z-40"></div>
+      </div>
     </div>
   </header>
 
   <!-- B. MAIN STAGE -->
   <div id="main-stage" class="w-full flex flex-col gap-6">
 
-    <!-- TURNTABLE STAGE -->
+    <!-- TURNTABLE & COVERFLOW STAGE -->
     <section id="turntable-engine" class="relative rounded-[28px] sm:rounded-[32px] overflow-hidden flex flex-col items-center justify-center min-h-[520px] sm:min-h-[660px] xl:min-h-[760px] py-8 sm:py-10 glass-card">
-      <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(147,178,63,.18)_0%,transparent_55%)] pointer-events-none"></div>
+      <div class="absolute inset-0 stage-glow-a pointer-events-none"></div>
       <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,.75)_0%,transparent_42%)] pointer-events-none"></div>
+
+      <!-- Stage View Mode Tabs (3D Turntable vs 3D Coverflow Deck) -->
+      <div class="flex items-center gap-1.5 bg-white/70 border border-app-line rounded-full p-1 shadow-sm mb-4 z-20">
+        <button id="stage-tab-vinyl" onclick="setStageMode('vinyl')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold border border-app-olive bg-app-olive/15 text-app-ink olive-glow cursor-pointer transition flex items-center gap-1.5"><i class="fa-solid fa-compact-disc text-app-olive"></i><span>3D Turntable</span></button>
+        <button id="stage-tab-coverflow" onclick="setStageMode('coverflow')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-app-muted hover:text-app-ink cursor-pointer transition flex items-center gap-1.5"><i class="fa-solid fa-layer-group"></i><span>3D Coverflow Deck</span></button>
+      </div>
 
       <!-- Disc + visualizer (WebGL canvas with CSS fallback) -->
       <div id="disc-wrap" class="relative w-[280px] h-[280px] sm:w-[400px] sm:h-[400px] xl:w-[520px] xl:h-[520px] flex items-center justify-center shrink-0">
@@ -145,11 +182,20 @@
         </div>
       </div>
 
+      <!-- 3D Coverflow Carousel Deck -->
+      <div id="coverflow-wrap" class="relative w-full max-w-5xl h-[340px] sm:h-[440px] xl:h-[500px] hidden flex items-center justify-center select-none" style="--cf-card: clamp(170px, 24vw, 290px);">
+        <div id="cf-frame" class="w-full relative cursor-grab overflow-hidden py-12 outline-none ring-ring active:cursor-grabbing" style="perspective: calc(var(--cf-card) * 3); touch-action: pan-y;">
+          <div id="cf-cards-container" class="relative select-none" style="height: var(--cf-card); transform-style: preserve-3d;"></div>
+        </div>
+        <button id="cf-btn-prev" onclick="CoverflowEngine.nudge(-1)" title="Previous card" class="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/90 shadow-md border border-app-line text-app-ink flex items-center justify-center hover:scale-105 transition active:scale-95 cursor-pointer"><i class="fa-solid fa-chevron-left"></i></button>
+        <button id="cf-btn-next" onclick="CoverflowEngine.nudge(1)" title="Next card" class="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/90 shadow-md border border-app-line text-app-ink flex items-center justify-center hover:scale-105 transition active:scale-95 cursor-pointer"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+
       <!-- Transport controls -->
       <div id="transport-controls" class="mt-7 sm:mt-8 flex items-center gap-3 sm:gap-5 z-10">
         <button id="btn-shuffle" class="w-11 h-11 rounded-full glass-card !bg-white/70 flex items-center justify-center text-app-muted hover:text-app-ink transition active:scale-95"><i class="fa-solid fa-shuffle"></i></button>
         <button id="btn-prev" class="w-11 h-11 rounded-full glass-card !bg-white/70 flex items-center justify-center text-app-ink hover:scale-105 transition active:scale-95"><i class="fa-solid fa-backward-step"></i></button>
-        <button id="play-btn" class="w-16 h-16 rounded-full bg-app-olive flex items-center justify-center text-white shadow-[0_0_34px_rgba(107,142,35,.5)] hover:scale-105 transition active:scale-95 cursor-pointer">
+        <button id="play-btn" class="w-16 h-16 rounded-full bg-app-olive flex items-center justify-center text-white play-glow hover:scale-105 transition active:scale-95 cursor-pointer">
           <i id="play-icon" class="fa-solid fa-play text-xl ml-0.5"></i>
         </button>
         <button id="btn-next" class="w-11 h-11 rounded-full glass-card !bg-white/70 flex items-center justify-center text-app-ink hover:scale-105 transition active:scale-95"><i class="fa-solid fa-forward-step"></i></button>
@@ -189,37 +235,16 @@
             <div id="vol-handle" class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-app-oliveDeep" style="left:calc(70% - 6px)"></div>
           </div>
         </div>
-      </div>
-
-    </section>
-
-    <!-- FULL-WIDTH KARAOKE LYRICS -->
-    <section id="karaoke-panel" class="glass-card rounded-[28px] p-5 sm:p-7">
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-app-olive pulse-dot"></span>
-          <h2 class="text-base font-bold tracking-wide">Lyrics</h2>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <button id="lang-dual" class="lang-btn px-3 py-1.5 rounded-full border border-app-olive bg-app-olive/15 text-app-ink font-semibold olive-glow text-[11px]">Dual (Urdu+Eng)</button>
-          <button id="lang-urdu" class="lang-btn px-3 py-1.5 rounded-full text-app-muted hover:text-app-ink transition border border-transparent text-[11px]">Urdu Nastaliq</button>
-          <button id="lang-eng" class="lang-btn px-3 py-1.5 rounded-full text-app-muted hover:text-app-ink transition border border-transparent text-[11px]">English</button>
-          <span class="w-px h-5 bg-app-line mx-1"></span>
-          <button id="romanize-lyrics-btn" title="Generate romanized lyrics for this track" class="w-8 h-8 rounded-full flex items-center justify-center bg-app-ink/5 border border-app-line text-xs text-app-muted hover:text-app-ink transition cursor-pointer"><span class="font-bold text-[10px]">Aa</span></button>
-          <button id="refetch-lyrics-btn" title="Refresh Lyrics" class="w-8 h-8 rounded-full flex items-center justify-center bg-app-ink/5 border border-app-line text-xs text-app-muted hover:text-app-ink transition cursor-pointer"><i class="fa-solid fa-arrows-rotate text-[11px]"></i></button>
-          <button id="rebuild-lyrics-btn" title="Delete ALL saved subtitles and rebuild them from scratch in the background" class="w-8 h-8 rounded-full flex items-center justify-center bg-app-ink/5 border border-app-line text-xs text-app-muted hover:text-app-ink transition cursor-pointer"><i class="fa-solid fa-broom text-[11px]"></i></button>
-          <button id="fullscreen-lyrics-btn" title="Full Screen Subtitles (Press F)" class="text-xs text-app-muted hover:text-app-ink transition flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-app-ink/5 border border-app-line hover:border-app-olive/50 cursor-pointer">
-            <i class="fa-solid fa-expand text-[10px] text-app-olive"></i><span class="text-[11px] font-medium">Fullscreen</span>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="fullscreen-lyrics-btn" title="Full Screen Lyrics (Press F)" class="text-xs text-app-muted hover:text-app-ink transition flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-app-ink/5 border border-app-line hover:border-app-olive/50 cursor-pointer">
+            <i class="fa-solid fa-closed-captioning text-[10px] text-app-olive"></i><span class="text-[11px] font-medium">Lyrics</span>
+          </button>
+          <button id="fullscreen-np-btn" title="Full Screen Now Playing — big HD artwork (Press V)" class="text-xs text-app-muted hover:text-app-ink transition flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-app-ink/5 border border-app-line hover:border-app-olive/50 cursor-pointer">
+            <i class="fa-regular fa-image text-[10px] text-app-olive"></i><span class="text-[11px] font-medium">Now Playing</span>
           </button>
         </div>
       </div>
-      <div id="lyrics-stream" class="h-[340px] sm:h-[440px] xl:h-[500px] overflow-y-auto py-5 pr-1 sm:pr-3">
-        <div class="py-16 text-center text-sm text-app-muted">Select a song to display synchronized dual-language subtitles</div>
-      </div>
-      <div id="lyrics-footer" class="mt-5 pt-4 border-t border-app-line flex items-center justify-between text-[11px] text-app-muted">
-        <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-app-olive pulse-dot"></span><span id="lyrics-status-text">Now syncing · SRT + Nastaliq overlay</span></span>
-        <span id="lyrics-count-text" class="font-mono text-app-ink">0 lines</span>
-      </div>
+
     </section>
   </div>
 
@@ -239,7 +264,7 @@
           <button id="playlists-btn" title="Playlists" class="text-xs text-app-muted hover:text-app-ink transition flex items-center gap-1.5">
             <i class="fa-solid fa-layer-group"></i><span>Playlists</span>
           </button>
-          <div id="playlists-menu" class="hidden absolute right-0 top-full mt-2 w-72 max-h-80 overflow-y-auto glass-card rounded-2xl p-2 z-40"></div>
+          <div id="playlists-menu" class="hidden absolute right-0 top-full mt-2 w-72 max-h-80 overflow-y-auto glass-card glass-blur rounded-2xl p-2 z-40"></div>
         </div>
         <button id="crossfade-btn" title="Auto-fade between tracks" class="text-xs text-app-muted hover:text-app-ink transition flex items-center gap-1.5">
           <i class="fa-solid fa-wave-square"></i><span id="crossfade-label">Fade: Off</span>
@@ -258,11 +283,11 @@
 <!-- =========================================================================
      FULLSCREEN IMMERSIVE SUBTITLES MODAL
      ========================================================================= -->
-<div id="fullscreen-lyrics-modal" class="fixed inset-0 z-50 bg-[#f7f8f2] flex flex-col justify-between p-4 sm:p-8 hidden select-none overflow-hidden">
-  <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(107,142,35,0.14)_0%,transparent_70%)] pointer-events-none"></div>
+<div id="fullscreen-lyrics-modal" class="fixed inset-0 z-50 bg-app-bg flex flex-col justify-between p-4 sm:p-8 hidden select-none overflow-hidden">
+  <div class="absolute inset-0 fs-vignette pointer-events-none"></div>
 
   <!-- Top Navigation & Info (Auto-fades on idle) -->
-  <div id="fs-top-bar" class="relative z-20 flex items-center justify-between border-b border-app-line pb-3 max-w-5xl w-full mx-auto transition-opacity duration-500">
+  <div id="fs-top-bar" class="relative z-20 shrink-0 flex items-center justify-between border-b border-app-line pb-3 max-w-5xl w-full mx-auto transition-opacity duration-500">
     <div class="flex items-center gap-3 min-w-0">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-app-olive to-app-oliveDeep flex items-center justify-center text-white shrink-0 shadow-lg">
         <i class="fa-solid fa-compact-disc animate-spin" style="animation-duration: 8s;"></i>
@@ -273,38 +298,272 @@
       </div>
     </div>
 
-    <!-- Language Filter & Exit Button -->
+    <!-- Spotify-style view switcher -->
+    <div class="flex-1 flex items-center justify-center px-2 min-w-0">
+      <div id="fs-view-tabs" class="flex items-center gap-1 text-xs bg-white/70 p-1 rounded-full border border-app-line shadow-sm">
+        <button id="fs-tab-nowplaying" class="fs-tab-btn px-3.5 py-1.5 rounded-full text-app-muted hover:text-app-ink cursor-pointer transition whitespace-nowrap"><i class="fa-regular fa-image mr-1.5 text-[10px]"></i>Now Playing</button>
+        <button id="fs-tab-lyrics" class="fs-tab-btn px-3.5 py-1.5 rounded-full text-app-muted hover:text-app-ink cursor-pointer transition whitespace-nowrap"><i class="fa-solid fa-closed-captioning mr-1.5 text-[10px]"></i>Lyrics</button>
+      </div>
+    </div>
+
+    <!-- Lyric Tools, Language Filter, Queue Toggle & Exit Button -->
     <div class="flex items-center gap-2 shrink-0">
-      <div class="flex items-center gap-1 text-xs bg-white/70 p-1 rounded-full border border-app-line">
+      <div id="fs-lyric-tools" class="hidden items-center gap-1 text-xs bg-white/70 p-1 rounded-full border border-app-line">
+        <button id="romanize-lyrics-btn" title="Generate romanized lyrics for this track" class="w-7 h-7 rounded-full flex items-center justify-center text-app-muted hover:text-app-ink transition cursor-pointer"><span class="font-bold text-[10px]">Aa</span></button>
+        <button id="refetch-lyrics-btn" title="Refresh lyrics for this track" class="w-7 h-7 rounded-full flex items-center justify-center text-app-muted hover:text-app-ink transition cursor-pointer"><i class="fa-solid fa-arrows-rotate text-[11px]"></i></button>
+        <button id="rebuild-lyrics-btn" title="Delete ALL saved subtitles and rebuild them from scratch in the background" class="w-7 h-7 rounded-full flex items-center justify-center text-app-muted hover:text-app-ink transition cursor-pointer"><i class="fa-solid fa-broom text-[11px]"></i></button>
+      </div>
+      <div id="fs-lang-group" class="flex items-center gap-1 text-xs bg-white/70 p-1 rounded-full border border-app-line">
         <button id="fs-lang-dual" class="fs-lang-btn px-3 py-1 rounded-full border border-app-olive bg-app-olive/15 text-app-ink font-semibold olive-glow cursor-pointer transition">Dual</button>
         <button id="fs-lang-urdu" class="fs-lang-btn px-3 py-1 rounded-full text-app-muted hover:text-app-ink cursor-pointer transition">Urdu</button>
         <button id="fs-lang-eng" class="fs-lang-btn px-3 py-1 rounded-full text-app-muted hover:text-app-ink cursor-pointer transition">English</button>
       </div>
+      <button id="fs-queue-toggle" title="Toggle song list" class="hidden w-9 h-9 rounded-full bg-white/70 border border-app-line text-app-muted hover:text-app-ink transition items-center justify-center cursor-pointer">
+        <i class="fa-solid fa-list-ul text-xs"></i>
+      </button>
       <button id="close-fs-lyrics" class="px-3.5 py-1.5 rounded-full glass-card text-xs text-app-ink hover:bg-white transition flex items-center gap-1.5 cursor-pointer">
         <i class="fa-solid fa-compress"></i><span class="hidden sm:inline">Exit (Esc)</span>
       </button>
     </div>
   </div>
 
-  <!-- Giant Cinema-Grade Synced Lyrics Stream (Spotify-style, left-aligned) -->
-  <div id="fs-lyrics-stream" class="relative z-10 flex-1 overflow-y-auto px-6 sm:px-12 space-y-8 sm:space-y-10 text-left no-scrollbar max-w-3xl w-full mx-auto" style="padding-top: 26vh; padding-bottom: 46vh;">
+  <!-- NOW PLAYING VIEW — 3D Coverflow Sliding Deck + side music list -->
+  <div id="fs-nowplaying" class="relative z-10 flex-1 flex flex-col lg:flex-row items-stretch gap-4 sm:gap-8 min-h-0 hidden">
+    <div class="flex-1 flex flex-col items-center justify-center gap-3 sm:gap-4 min-w-0 min-h-0 relative">
+      
+      <!-- Fullscreen 3D Coverflow Carousel Deck -->
+      <div id="fs-coverflow-wrap" class="relative w-full max-w-5xl h-[340px] sm:h-[460px] xl:h-[540px] flex items-center justify-center select-none" style="--cf-card: clamp(200px, 36vh, 440px);">
+        <div id="fs-cf-frame" class="w-full relative cursor-grab overflow-hidden py-10 outline-none ring-ring active:cursor-grabbing" style="perspective: calc(var(--cf-card) * 3); touch-action: pan-y;">
+          <div id="fs-cf-cards-container" class="relative select-none" style="height: var(--cf-card); transform-style: preserve-3d;"></div>
+        </div>
+        <button id="fs-cf-btn-prev" onclick="FsCoverflowEngine.nudge(-1)" title="Previous card" class="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white/90 shadow-xl border border-app-line text-app-ink flex items-center justify-center hover:scale-105 transition active:scale-95 cursor-pointer"><i class="fa-solid fa-chevron-left text-sm"></i></button>
+        <button id="fs-cf-btn-next" onclick="FsCoverflowEngine.nudge(1)" title="Next card" class="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white/90 shadow-xl border border-app-line text-app-ink flex items-center justify-center hover:scale-105 transition active:scale-95 cursor-pointer"><i class="fa-solid fa-chevron-right text-sm"></i></button>
+      </div>
+
+      <div class="text-center max-w-[85%] shrink-0 z-20">
+        <h2 id="fs-np-title" class="text-lg sm:text-2xl xl:text-3xl font-bold text-app-ink leading-tight truncate">No Song Playing</h2>
+        <p id="fs-np-artist" class="text-[11px] sm:text-sm text-app-muted mt-1 truncate">AuraDisc Pro</p>
+      </div>
+    </div>
+
+    <!-- Side music list (Spotify-style queue / vault) -->
+    <aside id="fs-np-queue" class="hidden lg:flex w-[300px] xl:w-[350px] shrink-0 flex-col min-h-0 glass-card rounded-[24px] p-3">
+      <div class="flex items-center justify-between px-2 pb-2.5 mb-1 border-b border-app-line shrink-0">
+        <h3 class="text-xs font-bold tracking-wide text-app-ink"><i class="fa-solid fa-list-ul text-app-olive mr-1.5"></i>Up Next</h3>
+        <span id="fs-np-queue-count" class="text-[10px] font-mono text-app-muted">0 tracks</span>
+      </div>
+      <div id="fs-np-queue-rows" class="flex-1 overflow-y-auto min-h-0 space-y-1 py-1.5 pr-1">
+        <div class="py-10 text-center text-xs text-app-muted">Vault is empty</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Giant Cinema-Grade Synced Lyrics Stream (Spotify-style, hard left-aligned) -->
+  <div id="fs-lyrics-stream" class="relative z-10 flex-1 min-h-0 overflow-y-auto px-5 sm:px-12 space-y-8 sm:space-y-10 text-left no-scrollbar w-full" style="padding-top: 20vh; padding-bottom: 30vh; mask-image: linear-gradient(to bottom, transparent 0%, black 14%, black 86%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 14%, black 86%, transparent 100%);">
     <div class="py-24 text-center text-sm text-app-muted">Select a song to start karaoke</div>
   </div>
 
   <!-- Bottom Floating Transport Controls for Fullscreen (Auto-fades on idle) -->
-  <div id="fs-bottom-bar" class="relative z-20 w-full max-w-2xl mx-auto flex flex-col items-center gap-2.5 pt-3 border-t border-app-line transition-opacity duration-500 bg-white/70 backdrop-blur-md rounded-full px-6 py-2">
+  <div id="fs-bottom-bar" class="relative z-20 shrink-0 w-full max-w-2xl mx-auto flex flex-col items-center gap-3 px-6 sm:px-8 py-3 sm:py-3.5 rounded-3xl sm:rounded-full bg-white/95 shadow-2xl border border-app-line/80 backdrop-blur-md transition-opacity duration-500 mb-1 sm:mb-2">
     <div class="flex items-center gap-6">
       <button id="fs-btn-prev" class="text-app-ink/70 hover:text-app-ink transition text-sm cursor-pointer"><i class="fa-solid fa-backward-step"></i></button>
       <button id="fs-btn-play" class="w-11 h-11 rounded-full bg-app-olive text-white flex items-center justify-center hover:scale-105 transition shadow-lg cursor-pointer"><i id="fs-play-icon" class="fa-solid fa-play text-sm ml-0.5"></i></button>
       <button id="fs-btn-next" class="text-app-ink/70 hover:text-app-ink transition text-sm cursor-pointer"><i class="fa-solid fa-forward-step"></i></button>
     </div>
-    <div class="w-full flex items-center gap-3 text-xs font-mono text-app-muted">
-      <span id="fs-time-cur">00:00</span>
+    <div class="w-full flex items-center gap-3.5 text-xs font-mono text-app-muted shrink-0">
+      <span id="fs-time-cur" class="w-10 text-right shrink-0 font-medium">00:00</span>
       <div id="fs-scrub-box" class="relative flex-1 h-2 rounded-full scrub-track overflow-visible cursor-pointer">
         <div id="fs-scrub-fill" class="absolute inset-y-0 left-0 rounded-full scrub-fill" style="width: 0%"></div>
       </div>
-      <span id="fs-time-dur">00:00</span>
+      <span id="fs-time-dur" class="w-10 text-left shrink-0 font-medium">00:00</span>
     </div>
+  </div>
+</div>
+
+<!-- C. SPOTIFY / PLAYLIST PREVIEW & FORMAT SELECTION MODAL -->
+<div id="playlist-preview-modal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-md hidden transition-all duration-300">
+  <div class="glass-card !bg-white/95 rounded-[32px] w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-app-olive/30 animate-in fade-in zoom-in-95 duration-200">
+    
+    <!-- Modal Header -->
+    <div class="px-6 py-5 border-b border-app-line flex items-center justify-between gap-4 bg-gradient-to-r from-app-olive/10 via-transparent to-transparent shrink-0">
+      <div class="flex items-center gap-4 min-w-0">
+        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shrink-0 shadow-md bg-app-olive/20 flex items-center justify-center">
+          <img id="pl-preview-cover" class="w-full h-full object-cover hidden" alt="Playlist Cover">
+          <i id="pl-preview-cover-fallback" class="fa-solid fa-music text-3xl text-app-olive"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span id="pl-preview-badge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-app-olive text-white uppercase tracking-wider">Spotify Playlist</span>
+            <span id="pl-preview-count" class="text-xs font-mono text-app-muted">0 songs</span>
+          </div>
+          <h2 id="pl-preview-title" class="text-lg sm:text-xl font-bold text-app-ink truncate">Playlist Title</h2>
+          <p id="pl-preview-subtitle" class="text-xs text-app-muted truncate">By Artist/Creator</p>
+        </div>
+      </div>
+      <button onclick="closePlaylistPreviewModal()" class="w-10 h-10 rounded-full glass-card flex items-center justify-center text-app-muted hover:text-app-ink hover:scale-105 transition active:scale-95 shrink-0">
+        <i class="fa-solid fa-xmark text-base"></i>
+      </button>
+    </div>
+
+    <!-- Global Format & Selection Toolbar -->
+    <div class="px-6 py-3 bg-app-ink/[0.02] border-b border-app-line flex flex-wrap items-center justify-between gap-3 shrink-0">
+      <div class="flex items-center gap-2">
+        <button id="pl-select-all-btn" onclick="togglePlaylistSelectAll()" class="px-3 py-1.5 rounded-full glass-card !bg-white text-xs font-semibold text-app-ink hover:bg-app-olive/10 transition flex items-center gap-2">
+          <i id="pl-select-all-icon" class="fa-regular fa-square-check text-app-olive"></i>
+          <span id="pl-select-all-text">Deselect All</span>
+        </button>
+        <span class="text-xs text-app-muted font-medium ml-1"><span id="pl-selected-count" class="text-app-olive font-bold">0</span> of <span id="pl-total-count">0</span> selected</span>
+      </div>
+
+      <!-- Format selector for all tracks -->
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-bold text-app-muted uppercase tracking-wider hidden sm:inline">Set All Formats:</span>
+        <div id="pl-global-format-selector" class="glass-card !bg-white/70 rounded-full p-0.5 flex items-center text-xs">
+          <button onclick="setPlaylistGlobalFormat('mp3')" id="pl-fmt-mp3" class="pl-fmt-btn px-3 py-1 rounded-full text-app-muted hover:text-app-ink transition">MP3 320k</button>
+          <button onclick="setPlaylistGlobalFormat('flac')" id="pl-fmt-flac" class="pl-fmt-btn px-3 py-1 rounded-full text-app-muted hover:text-app-ink transition">FLAC Lossless</button>
+          <button onclick="setPlaylistGlobalFormat('bluray')" id="pl-fmt-bluray" class="pl-fmt-btn active px-3 py-1 rounded-full border border-app-olive bg-app-olive/15 text-app-ink font-semibold">BluRay Hi-Res 96/24</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scrollable Tracklist -->
+    <div id="pl-tracks-container" class="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-2">
+      <!-- Generated rows -->
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div class="px-6 py-4 border-t border-app-line flex items-center justify-between gap-3 bg-white/80 shrink-0">
+      <button onclick="closePlaylistPreviewModal()" class="px-5 py-2.5 rounded-full border border-app-line text-xs font-semibold text-app-muted hover:text-app-ink transition">
+        Cancel
+      </button>
+      <button id="pl-download-btn" onclick="startPlaylistDownload()" class="px-6 py-2.5 rounded-full bg-app-olive text-white text-xs sm:text-sm font-bold hover:bg-app-oliveDeep shadow-lg hover:shadow-app-olive/30 transition flex items-center gap-2 active:scale-95">
+        <i class="fa-solid fa-cloud-arrow-down"></i>
+        <span>Download Selected (<span id="pl-btn-count">0</span> Songs)</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- D. SINGLE TRACK FORMAT SELECTION MODAL -->
+<div id="track-format-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-md hidden transition-all duration-300 select-none">
+  <div class="glass-card !bg-white/95 rounded-[32px] w-full max-w-lg flex flex-col overflow-hidden shadow-2xl border border-app-olive/30 animate-in fade-in zoom-in-95 duration-200">
+    
+    <!-- Modal Header -->
+    <div class="px-6 py-4 border-b border-app-line flex items-center justify-between gap-4 bg-gradient-to-r from-app-olive/10 via-transparent to-transparent shrink-0">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-full bg-app-olive/15 flex items-center justify-center text-app-olive text-sm font-bold">
+          <i class="fa-solid fa-sliders"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-app-ink">Choose Audio Format</h3>
+          <p class="text-[11px] text-app-muted">Inspected stream quality for this song</p>
+        </div>
+      </div>
+      <button onclick="closeTrackFormatModal()" class="w-8 h-8 rounded-full flex items-center justify-center bg-app-ink/5 hover:bg-app-ink/10 text-app-muted hover:text-app-ink transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Track Preview Info -->
+    <div class="p-6 flex flex-col gap-5">
+      <div class="flex items-center gap-4 p-3.5 rounded-2xl bg-app-olive/[0.06] border border-app-olive/20">
+        <div class="w-16 h-16 rounded-xl overflow-hidden shrink-0 relative shadow-md bg-app-olive/15 flex items-center justify-center">
+          <img id="tf-cover" src="" alt="Album Art" class="w-full h-full object-cover hidden">
+          <div id="tf-cover-fallback" class="w-full h-full flex items-center justify-center bg-gradient-to-br from-app-olive to-app-oliveDeep text-white text-xl">
+            <i class="fa-solid fa-compact-disc"></i>
+          </div>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span id="tf-source-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-app-olive text-white tracking-wider uppercase">YOUTUBE</span>
+            <span id="tf-duration" class="text-[11px] font-mono text-app-muted">00:00</span>
+          </div>
+          <h4 id="tf-title" class="text-sm font-bold text-app-ink truncate">Song Title</h4>
+          <p id="tf-artist" class="text-xs text-app-muted truncate">Artist Name</p>
+        </div>
+      </div>
+
+      <!-- Format Cards -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-app-ink">Select Output Format</span>
+          <span id="tf-quality-badge" class="text-[10px] font-mono text-app-muted">Max Bitrate: 160kbps</span>
+        </div>
+        <div id="tf-formats-container" class="flex flex-col gap-2.5">
+          <!-- Dynamic format options -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Action Buttons -->
+    <div class="px-6 py-4 bg-app-ink/[0.02] border-t border-app-line flex items-center justify-between gap-3 shrink-0">
+      <button onclick="closeTrackFormatModal()" class="px-5 py-2.5 rounded-full border border-app-line text-xs font-semibold text-app-muted hover:text-app-ink transition cursor-pointer">
+        Cancel
+      </button>
+      <button id="tf-download-btn" onclick="confirmTrackDownload()" class="px-6 py-2.5 rounded-full bg-app-olive hover:bg-app-oliveDeep text-white text-xs sm:text-sm font-bold shadow-lg hover:shadow-app-olive/30 transition active:scale-95 flex items-center gap-2 cursor-pointer">
+        <i class="fa-solid fa-cloud-arrow-down"></i>
+        <span id="tf-btn-label">Download Song</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- E. DEDICATED DOWNLOAD PROGRESS WINDOW / MODAL -->
+<div id="download-progress-modal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-md hidden transition-all duration-300">
+  <div class="glass-card !bg-white/95 rounded-[32px] w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-app-olive/30 animate-in fade-in zoom-in-95 duration-200">
+    
+    <!-- Modal Header -->
+    <div class="px-6 py-5 border-b border-app-line flex items-center justify-between gap-4 bg-gradient-to-r from-app-olive/15 via-transparent to-transparent shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-app-olive text-white flex items-center justify-center text-lg shadow-md">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-base sm:text-lg font-bold text-app-ink">Download Center</h2>
+            <span id="dl-modal-active-badge" class="px-2 py-0.5 rounded-full bg-app-olive/15 text-app-oliveDeep border border-app-olive text-[11px] font-bold font-mono">0 active</span>
+          </div>
+          <p id="dl-modal-status-text" class="text-xs text-app-muted">Real-time song downloading & transcoding</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="clearFinishedDownloads()" title="Clear completed downloads" class="px-3 py-1.5 rounded-full glass-card !bg-white/80 text-xs font-semibold text-app-muted hover:text-app-ink transition hidden sm:inline-flex items-center gap-1.5">
+          <i class="fa-regular fa-trash-can text-[11px]"></i><span>Clear Done</span>
+        </button>
+        <button onclick="toggleDownloadModal(false)" title="Minimize and continue in background" class="px-4 py-2 rounded-full bg-app-ink/5 border border-app-line text-xs font-semibold text-app-ink hover:bg-white transition flex items-center gap-1.5 active:scale-95">
+          <i class="fa-solid fa-chevron-down text-xs"></i><span>Minimize</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Overall Batch Progress Bar -->
+    <div id="dl-modal-total-bar-container" class="px-6 py-3 bg-app-olive/[0.06] border-b border-app-line flex items-center gap-4 shrink-0">
+      <div class="flex-1 flex flex-col gap-1.5">
+        <div class="flex items-center justify-between text-xs font-semibold text-app-ink">
+          <span id="dl-modal-total-label">Overall Progress</span>
+          <span id="dl-modal-total-pct" class="font-mono text-app-olive font-bold">0%</span>
+        </div>
+        <div class="w-full h-2 rounded-full bg-app-ink/10 overflow-hidden relative">
+          <div id="dl-modal-total-fill" class="h-full rounded-full scrub-fill transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Card Rows List -->
+    <div id="dl-modal-rows" class="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-3">
+      <div class="py-16 text-center text-sm text-app-muted">No downloads in queue</div>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-6 py-3.5 border-t border-app-line flex items-center justify-between text-xs text-app-muted bg-white/70 shrink-0">
+      <span>Files saved to <code class="font-mono text-app-ink font-semibold">~/Music/AutoDownloads</code></span>
+      <button onclick="toggleDownloadModal(false)" class="text-app-olive hover:text-app-oliveDeep font-semibold transition">
+        Return to Player →
+      </button>
+    </div>
+
   </div>
 </div>
 
@@ -329,22 +588,84 @@ const App = {
   repeatMode: 'off', // 'off' | 'all' | 'one'
   savedQueue: [],
   playlistFilter: null,
-  crossfadeSec: 0
+  crossfadeSec: 0,
+  fsTab: 'lyrics' // 'lyrics' | 'nowplaying'
 };
 
 const audio = document.getElementById('audio-player');
+
+// ============================================================================
+// RETRO THEMES — soft palettes, applied app-wide via CSS variables
+// ============================================================================
+const THEMES = {
+  olive:    { name: 'Olive Grove',   bg: [247,248,242], bg2: [245,247,236], bg3: [234,239,219], accent: [107,142,35],  deep: [74,101,22],  soft: [147,178,63],  ink: [44,51,29] },
+  cream:    { name: 'Retro Cream',   bg: [248,243,233], bg2: [246,239,225], bg3: [239,228,205], accent: [176,137,84],  deep: [138,103,64], soft: [212,180,131], ink: [74,60,40] },
+  rose:     { name: 'Dusty Rose',    bg: [250,241,239], bg2: [247,235,232], bg3: [242,222,218], accent: [193,122,116], deep: [157,87,82],  soft: [224,164,158], ink: [67,48,46] },
+  denim:    { name: 'Faded Denim',   bg: [239,243,247], bg2: [233,239,245], bg3: [219,229,238], accent: [104,128,155], deep: [77,99,121],  soft: [157,180,200], ink: [38,48,59] },
+  lavender: { name: 'Lavender Haze', bg: [244,241,248], bg2: [240,236,246], bg3: [230,223,240], accent: [143,122,181], deep: [109,90,146], soft: [185,168,216], ink: [54,46,71] }
+};
+
+function applyTheme(key, save = true) {
+  const t = THEMES[key] || THEMES.olive;
+  App.theme = THEMES[key] ? key : 'olive';
+  const s = document.documentElement.style;
+  s.setProperty('--t-bg', t.bg.join(' '));
+  s.setProperty('--t-bg-2', t.bg2.join(' '));
+  s.setProperty('--t-bg-3', t.bg3.join(' '));
+  s.setProperty('--t-accent', t.accent.join(' '));
+  s.setProperty('--t-accent-deep', t.deep.join(' '));
+  s.setProperty('--t-accent-soft', t.soft.join(' '));
+  if (save) { try { localStorage.setItem('auradisc-theme', App.theme); } catch (e) {} }
+  if (typeof DiscEngine !== 'undefined' && DiscEngine && DiscEngine.setTheme) DiscEngine.setTheme(t);
+  else if (window.DiscEngine && window.DiscEngine.setTheme) window.DiscEngine.setTheme(t);
+  
+  // Update CSS fallback disc gradient if active
+  const fbDisc = document.getElementById('disc-fallback');
+  if (fbDisc) {
+    const c1 = `rgb(${Math.round(t.ink[0]*0.2 + t.deep[0]*0.2)}, ${Math.round(t.ink[1]*0.2 + t.deep[1]*0.2)}, ${Math.round(t.ink[2]*0.2 + t.deep[2]*0.2)})`;
+    const c2 = `rgb(${Math.round(t.deep[0]*0.45)}, ${Math.round(t.deep[1]*0.45)}, ${Math.round(t.deep[2]*0.45)})`;
+    const bgInner = fbDisc.querySelector('div:first-child');
+    if (bgInner) {
+      bgInner.style.background = `conic-gradient(from 0deg, ${c1}, ${c2}, ${c1}, ${c2}, ${c1})`;
+      bgInner.style.boxShadow = `0 0 60px rgba(${t.accent.join(',')},.35), inset 0 0 40px rgba(0,0,0,.5)`;
+    }
+  }
+
+  document.querySelectorAll('.theme-swatch').forEach(b => {
+    const active = b.dataset.theme === App.theme;
+    b.classList.toggle('bg-app-olive/15', active);
+    b.classList.toggle('border-app-olive/60', active);
+  });
+}
+
+function buildThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  menu.innerHTML = `<p class="px-3 pt-1.5 pb-2 text-[10px] font-bold tracking-widest uppercase text-app-muted">Retro Themes</p>` + Object.entries(THEMES).map(([key, t]) => `
+    <button data-theme="${key}" class="theme-swatch w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-transparent transition hover:bg-app-ink/[0.04]" onclick="applyTheme('${key}')">
+      <span class="flex -space-x-1.5 shrink-0">
+        <span class="w-4 h-4 rounded-full border-2 border-white" style="background:rgb(${t.accent.join(',')})"></span>
+        <span class="w-4 h-4 rounded-full border-2 border-white" style="background:rgb(${t.soft.join(',')})"></span>
+        <span class="w-4 h-4 rounded-full border-2 border-white" style="background:rgb(${t.bg3.join(',')})"></span>
+      </span>
+      <span class="text-xs font-semibold text-app-ink">${t.name}</span>
+    </button>`).join('');
+}
 
 // 1. Initial Load & Fetch Library
 async function loadLibrary() {
   try {
     const res = await fetch('/api/library');
     const data = await res.json();
-    if (data.status === 'success') {
-      App.library = data.library || [];
-      document.getElementById('telemetry-stat').innerText = `${App.library.length} in vault`;
-      document.getElementById('queue-count-badge').innerText = `${App.library.length} items`;
-      renderQueueAndLibrary();
-    }
+      if (data.status === 'success') {
+        App.library = data.library || [];
+        document.getElementById('telemetry-stat').innerText = `${App.library.length} in vault`;
+        document.getElementById('queue-count-badge').innerText = `${App.library.length} items`;
+        renderQueueAndLibrary();
+        renderFsQueue();
+        if (window.CoverflowEngine) CoverflowEngine.render();
+        if (window.FsCoverflowEngine) FsCoverflowEngine.render();
+      }
   } catch (err) {
     console.error('Failed to load library:', err);
   }
@@ -369,11 +690,11 @@ function renderQueueAndLibrary() {
         </div>
         <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-app-ink/5 text-app-muted border border-app-line shrink-0">${q.format}</span>
         <div class="relative flex-1 h-1.5 rounded-full bg-app-ink/10 overflow-hidden">
-          <div class="absolute inset-y-0 left-0 rounded-full scrub-fill transition-all duration-300" style="width:${q.progress}%"></div>
+          <div id="qrow-${qi}-fill" class="absolute inset-y-0 left-0 rounded-full scrub-fill" style="width:${q.progress}%"></div>
         </div>
-        <span class="text-[11px] font-mono w-20 text-right shrink-0 text-app-olive font-semibold">${Math.round(q.progress)}%</span>
-        <span class="text-[10px] w-24 text-right shrink-0 ${q.status === 'Failed' ? 'text-red-500' : (q.status === 'Done' ? 'text-green-700' : 'text-app-olive')}">${q.status}</span>
-        ${cancellable ? `<button onclick="event.stopPropagation(); cancelDownload(${qi})" title="Cancel download" class="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-app-ink/5 border border-app-line text-app-muted hover:text-red-500 hover:border-red-400/40 transition"><i class="fa-solid fa-xmark text-[11px]"></i></button>` : ''}
+        <span id="qrow-${qi}-pct" class="text-[11px] font-mono w-14 text-right shrink-0 text-app-olive font-semibold">${Math.round(q.progress)}%</span>
+        <span class="text-[10px] w-20 text-right shrink-0 ${q.status === 'Failed' ? 'text-red-500 font-semibold' : (q.status === 'Done' ? 'text-green-700 font-semibold' : 'text-app-olive')}">${q.status}</span>
+        ${cancellable ? `<button onclick="event.stopPropagation(); cancelDownload(${qi})" title="Cancel download" class="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-app-ink/5 border border-app-line text-app-muted hover:text-red-500 hover:border-red-400/40 transition cursor-pointer"><i class="fa-solid fa-xmark text-[11px]"></i></button>` : `<button onclick="event.stopPropagation(); dismissQueueItem(${qi})" title="Remove from list" class="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-red-50 hover:bg-red-100 border border-red-200 text-red-500 hover:text-red-700 transition cursor-pointer"><i class="fa-solid fa-trash-can text-[10px]"></i></button>`}
       </div>
     `);
   });
@@ -387,7 +708,7 @@ function renderQueueAndLibrary() {
     const isCurrent = App.currentIndex === i;
     const isQueued = App.savedQueue.includes(t.filename);
     allRows.push(`
-      <div class="flex items-center gap-4 p-3 rounded-2xl border transition cursor-pointer ${isCurrent ? 'border-app-olive/50 bg-app-olive/10' : 'bg-app-ink/[0.03] border-app-line hover:bg-app-olive/[0.07]'}" onclick="playTrack(${i})">
+      <div class="row-cv flex items-center gap-4 p-3 rounded-2xl border transition cursor-pointer ${isCurrent ? 'border-app-olive/50 bg-app-olive/10' : 'bg-app-ink/[0.03] border-app-line hover:bg-app-olive/[0.07]'}" onclick="playTrack(${i})">
         <div class="w-11 h-11 rounded-lg overflow-hidden shrink-0 relative bg-gradient-to-br from-app-olive to-app-oliveDeep flex items-center justify-center text-white">
           <i class="fa-solid fa-compact-disc ${isCurrent && App.isPlaying ? 'animate-spin text-app-oliveSoft' : 'text-white/85'}"></i>
         </div>
@@ -416,6 +737,65 @@ function renderQueueAndLibrary() {
   }
 }
 
+// Perf: download progress ticks patch only the affected row's fill/% text,
+// coalesced on a 400ms timer — never a full vault re-render per SSE event.
+let queueProgressTimer = null;
+const queueProgressDirty = new Set();
+
+function markQueueProgress(qItem) {
+  queueProgressDirty.add(qItem);
+  if (queueProgressTimer) return;
+  queueProgressTimer = setTimeout(() => {
+    queueProgressTimer = null;
+    queueProgressDirty.forEach(updateQueueRowProgress);
+    queueProgressDirty.clear();
+  }, 400);
+}
+
+function updateQueueRowProgress(qItem) {
+  const qi = App.queue.indexOf(qItem);
+  if (qi < 0) return;
+  const fill = document.getElementById(`qrow-${qi}-fill`);
+  if (!fill) { renderQueueAndLibrary(); return; } // row not built yet
+  fill.style.width = `${qItem.progress}%`;
+  const pct = document.getElementById(`qrow-${qi}-pct`);
+  if (pct) pct.innerText = `${Math.round(qItem.progress)}%`;
+}
+
+// Side music list in the fullscreen Now Playing view (click to play, current highlighted)
+function renderFsQueue() {
+  const box = document.getElementById('fs-np-queue-rows');
+  const count = document.getElementById('fs-np-queue-count');
+  if (!box) return;
+  if (count) count.innerText = `${App.library.length} tracks`;
+  if (!App.library.length) {
+    box.innerHTML = `<div class="py-10 text-center text-xs text-app-muted">Vault is empty</div>`;
+    return;
+  }
+  box.innerHTML = App.library.map((t, i) => {
+    const cur = i === App.currentIndex;
+    const lead = cur && App.isPlaying
+      ? '<i class="fa-solid fa-compact-disc animate-spin text-app-olive" style="animation-duration:4s"></i>'
+      : (i + 1);
+    return `
+      <button class="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-2xl border transition ${cur ? 'bg-app-olive/15 border-app-olive/50' : 'bg-transparent border-transparent hover:bg-app-ink/[0.04]'}" onclick="playTrack(${i})">
+        <span class="w-6 text-center text-[10px] font-mono shrink-0 ${cur ? 'text-app-olive' : 'text-app-muted'}">${lead}</span>
+        <span class="min-w-0 flex-1 block">
+          <span class="block text-xs font-semibold truncate ${cur ? 'text-app-oliveDeep' : 'text-app-ink'}">${t.title}</span>
+          <span class="block text-[10px] text-app-muted truncate">${t.artist}</span>
+        </span>
+        <span class="text-[10px] font-mono text-app-muted shrink-0">${t.duration_sec ? fmtTime(t.duration_sec) : String(t.format || '').toUpperCase()}</span>
+      </button>`;
+  }).join('');
+}
+
+function scrollFsQueueToCurrent() {
+  const box = document.getElementById('fs-np-queue-rows');
+  if (!box) return;
+  const curEl = box.children[App.currentIndex];
+  if (curEl) curEl.scrollIntoView({ block: 'center' });
+}
+
 function setVolumeUI(v) {
   document.getElementById('vol-fill').style.width = `${v * 100}%`;
   document.getElementById('vol-handle').style.left = `calc(${v * 100}% - 6px)`;
@@ -432,12 +812,22 @@ function setAppVolume(v) {
 }
 
 // 3. Audio Playback Controls
+let lastLyricsReqId = 0;
 function playTrack(index) {
   if (index < 0 || index >= App.library.length) return;
   App.currentIndex = index;
   App.currentTrack = App.library[index];
 
+  // Immediately clear old lyrics & reset state so previous song lyrics never leak
+  App.lyrics = [];
+  App.lyricsLoading = true;
+  App.activeLyricIdx = -1;
+  renderLyrics();
+  renderFullscreenLyrics();
+
   if (window.DiscEngine) DiscEngine.unlockAudio();
+  if (window.CoverflowEngine) CoverflowEngine.syncWithPlayer(index);
+  if (window.FsCoverflowEngine) FsCoverflowEngine.syncWithPlayer(index);
 
   // Reset any active fade so the new track starts at full volume
   if (fadeTimer) { clearInterval(fadeTimer); fadeTimer = null; }
@@ -457,16 +847,19 @@ function playTrack(index) {
   // Update Fullscreen meta
   document.getElementById('fs-track-title').innerText = App.currentTrack.title;
   document.getElementById('fs-track-artist').innerText = `${App.currentTrack.artist} · ${App.currentTrack.format}`;
+  updateFsNowPlayingMeta();
 
-  // Windows/browser media overlay (lock screen controls)
+  // Windows/browser media overlay (lock screen controls) — HD artwork endpoint, canvas label fallback
   if ('mediaSession' in navigator) {
     try {
+      const artUrl = `/api/artwork/${encodeURIComponent(App.currentTrack.filename)}`;
       const artworkSrc = window.DiscEngine ? DiscEngine.getLabelDataURL() : null;
       navigator.mediaSession.metadata = new MediaMetadata({
         title: App.currentTrack.title,
         artist: App.currentTrack.artist,
         album: 'AuraDisc Vault',
-        artwork: artworkSrc ? [{ src: artworkSrc, sizes: '512x512', type: 'image/png' }] : []
+        artwork: [{ src: artUrl, sizes: '1200x1200', type: 'image/jpeg' },
+                  ...(artworkSrc ? [{ src: artworkSrc, sizes: '512x512', type: 'image/png' }] : [])]
       });
     } catch (e) {}
   }
@@ -488,6 +881,7 @@ function playTrack(index) {
     body: JSON.stringify({ filename: App.currentTrack.filename })
   }).catch(() => {});
   renderQueueAndLibrary();
+  renderFsQueue();
 }
 
 function togglePlay() {
@@ -529,33 +923,36 @@ function updatePlaybackUI() {
 
 // 4. Synchronized Lyrics Fetch & Rendering
 async function fetchLyrics(filename, force = false) {
+  const reqId = ++lastLyricsReqId;
+  App.lyricsLoading = true;
+  renderLyrics();
+  renderFullscreenLyrics();
+
   try {
     const res = await fetch(`/api/lyrics?filename=${encodeURIComponent(filename)}${force ? '&refresh=true' : ''}`);
     const data = await res.json();
+    
+    // Discard response if track changed or newer request started
+    if (reqId !== lastLyricsReqId || !App.currentTrack || App.currentTrack.filename !== filename) {
+      return;
+    }
+
     if (data.status === 'success' && data.lyrics) {
       App.lyrics = mergeSidecars(parseLRC(data.lyrics, data.lyrics_by_lang), data.lyrics_by_lang);
-      document.getElementById('lyrics-count-text').innerText = `${App.lyrics.length} lines`;
-      
-      const hasUrdu = App.lyrics.some(l => l.hasUrdu);
-      const hasEng = App.lyrics.some(l => l.hasEng);
-      
-      if (hasUrdu && hasEng) {
-        document.getElementById('lyrics-status-text').innerText = 'Dual-Language Synced (Urdu + Eng)';
-      } else if (hasUrdu) {
-        document.getElementById('lyrics-status-text').innerText = 'Urdu Nastaliq Synced';
-      } else {
-        document.getElementById('lyrics-status-text').innerText = 'English / Roman Synced';
-      }
     } else {
       App.lyrics = [];
-      document.getElementById('lyrics-count-text').innerText = '0 lines';
-      document.getElementById('lyrics-status-text').innerText = 'No lyrics available';
     }
   } catch (e) {
+    if (reqId !== lastLyricsReqId) return;
     App.lyrics = [];
+  } finally {
+    if (reqId === lastLyricsReqId) {
+      App.lyricsLoading = false;
+      renderLyrics();
+      renderFullscreenLyrics();
+      updateLyricsHighlight(audio.currentTime || 0);
+    }
   }
-  renderLyrics();
-  renderFullscreenLyrics();
 }
 
 // C4: merge roman/english sidecar lyrics into parsed lines by timestamp
@@ -657,7 +1054,7 @@ function parseLRC(raw, sidecars = {}) {
   return dual;
 }
 
-// Shared Spotify-style lyric row builder: big Comfortaa Bold lines, strong active/inactive contrast
+// Shared Spotify-style lyric row builder: big Comfortaa Bold lines, extreme left/right positioning
 function buildLyricRows(prefix) {
   return App.lyrics.map((l, idx) => {
     let u = '', e = '';
@@ -670,20 +1067,34 @@ function buildLyricRows(prefix) {
       u = l.eng || l.engS || l.singleText;
     }
     if (!u && e) { u = e; e = ''; }
+
+    // Dual mode with both Urdu and English present
+    if (App.lyricsLang === 'dual' && l.hasUrdu && (l.eng || l.roman)) {
+      return `
+        <div id="${prefix}-${idx}" class="lyric-row dual w-full flex flex-col gap-1.5" onclick="audio.currentTime = ${l.time}">
+          <p class="lyric-u font-urdu text-right w-full" dir="rtl">${l.urdu}</p>
+          <p class="lyric-e font-sans text-left w-full">${l.eng || l.roman}</p>
+        </div>
+      `;
+    }
+
     const isUrdu = /[\u0600-\u06FF\u0750-\u077F]/.test(u || '');
     const dir = isUrdu ? ' dir="rtl"' : '';
     const fontCls = isUrdu ? 'font-urdu' : 'font-sans';
+    const alignCls = isUrdu ? 'urdu' : 'eng';
     return `
-      <div id="${prefix}-${idx}" class="lyric-row" onclick="audio.currentTime = ${l.time}">
+      <div id="${prefix}-${idx}" class="lyric-row ${alignCls} w-full" onclick="audio.currentTime = ${l.time}">
         <p class="lyric-u ${fontCls}"${dir}>${u}</p>
-        ${e ? `<p class="lyric-e">${e}</p>` : ''}
+        ${e ? `<p class="lyric-e font-sans">${e}</p>` : ''}
       </div>
     `;
   }).join('');
 }
 
 function renderLyrics() {
+  // Main-page lyrics panel was removed — karaoke renders into the fullscreen view only
   const container = document.getElementById('lyrics-stream');
+  if (!container) return;
   if (!App.lyrics || App.lyrics.length === 0) {
     container.innerHTML = `<div class="py-16 text-center text-sm text-app-muted">No lyrics available for this song</div>`;
     return;
@@ -711,8 +1122,26 @@ function renderFullscreenLyrics() {
   const container = document.getElementById('fs-lyrics-stream');
   if (!container) return;
 
+  if (App.lyricsLoading) {
+    container.innerHTML = `
+      <div class="py-32 text-center text-base text-app-muted">
+        <div class="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/70 shadow-sm border border-app-line">
+          <i class="fa-solid fa-compact-disc animate-spin text-app-olive text-lg"></i>
+          <span class="font-semibold text-app-ink">Loading synchronized lyrics...</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   if (!App.lyrics || App.lyrics.length === 0) {
-    container.innerHTML = `<div class="py-32 text-center text-base text-app-muted">No lyrics available for this song</div>`;
+    container.innerHTML = `
+      <div class="py-32 text-center text-base text-app-muted">
+        <i class="fa-solid fa-music text-3xl mb-3 text-app-olive opacity-40"></i>
+        <p class="font-bold text-app-ink">No synchronized lyrics available</p>
+        <p class="text-xs text-app-muted mt-1">Click the refresh icon in the top bar to retry</p>
+      </div>
+    `;
     return;
   }
 
@@ -810,14 +1239,559 @@ audio.addEventListener('ended', () => {
   }
 });
 
-// 6. Download Trigger (async job queue + live SSE progress)
-async function triggerDownload(query) {
+// ============================================================================
+// DOWNLOAD PROGRESS WINDOW & PLAYLIST PREVIEW CONTROLLERS
+// ============================================================================
+let currentPlaylistData = null;
+
+function isPlaylistUrl(url) {
+  if (!url) return false;
+  const s = String(url).trim();
+  return /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(?:user\/[^\/]+\/)?(playlist|album)\//i.test(s)
+      || /spotify:(playlist|album):/i.test(s)
+      || /spotify\.link\//i.test(s)
+      || /youtube\.com\/playlist/i.test(s)
+      || /([&?]list=)/i.test(s);
+}
+
+function toggleDownloadModal(show) {
+  const modal = document.getElementById('download-progress-modal');
+  if (!modal) return;
+  if (show === undefined) show = modal.classList.contains('hidden');
+  modal.classList.toggle('hidden', !show);
+  if (show) renderDownloadModalRows();
+}
+
+function renderDownloadModalRows() {
+  const container = document.getElementById('dl-modal-rows');
+  const activeBadge = document.getElementById('dl-modal-active-badge');
+  const headerBadge = document.getElementById('header-dl-badge');
+  const totalFill = document.getElementById('dl-modal-total-fill');
+  const totalPct = document.getElementById('dl-modal-total-pct');
+  const totalLabel = document.getElementById('dl-modal-total-label');
+
+  const activeDownloads = App.queue.filter(q => q.status === 'Downloading' || q.status === 'Queued' || q.status === 'Processing');
+  const activeCount = activeDownloads.length;
+
+  if (activeBadge) activeBadge.innerText = `${activeCount} active`;
+  if (headerBadge) {
+    if (activeCount > 0) {
+      headerBadge.innerText = activeCount;
+      headerBadge.classList.remove('hidden');
+    } else {
+      headerBadge.classList.add('hidden');
+    }
+  }
+
+  // Calculate overall batch progress
+  if (App.queue.length > 0) {
+    const sumProgress = App.queue.reduce((acc, q) => acc + (q.progress || 0), 0);
+    const avgProgress = Math.round(sumProgress / App.queue.length);
+    if (totalFill) totalFill.style.width = `${avgProgress}%`;
+    if (totalPct) totalPct.innerText = `${avgProgress}%`;
+    if (totalLabel) totalLabel.innerText = activeCount > 0 ? `Downloading ${activeCount} of ${App.queue.length} track${App.queue.length > 1 ? 's' : ''}` : `All downloads complete (${App.queue.length} items)`;
+  } else {
+    if (totalFill) totalFill.style.width = '0%';
+    if (totalPct) totalPct.innerText = '0%';
+    if (totalLabel) totalLabel.innerText = 'Overall Progress';
+  }
+
+  if (!container) return;
+
+  if (App.queue.length === 0) {
+    container.innerHTML = `
+      <div class="py-16 flex flex-col items-center justify-center text-center text-app-muted">
+        <div class="w-14 h-14 rounded-full bg-app-ink/5 flex items-center justify-center text-2xl mb-3 text-app-muted">
+          <i class="fa-solid fa-circle-check text-app-olive"></i>
+        </div>
+        <p class="text-sm font-semibold text-app-ink">No active downloads</p>
+        <p class="text-xs text-app-muted mt-1">Paste a song or playlist link above to start downloading</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = App.queue.map((q, idx) => {
+    const isDone = q.status === 'Done';
+    const isFailed = q.status === 'Failed';
+    const isCancelled = q.status === 'Cancelled';
+    const isRunning = q.status === 'Downloading' || q.status === 'Queued' || q.status === 'Processing';
+
+    let statusBadgeClass = 'bg-app-olive/15 text-app-oliveDeep border-app-olive';
+    if (isDone) statusBadgeClass = 'bg-green-100 text-green-800 border-green-300';
+    else if (isFailed) statusBadgeClass = 'bg-red-100 text-red-700 border-red-300';
+    else if (isCancelled) statusBadgeClass = 'bg-gray-100 text-gray-700 border-gray-300';
+
+    return `
+      <div id="dl-card-${idx}" class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition ${isRunning ? 'bg-app-olive/[0.04] border-app-olive/30 shadow-sm' : (isDone ? 'bg-white border-green-200' : 'bg-white/80 border-app-line')}">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="w-11 h-11 rounded-xl bg-app-olive/15 flex items-center justify-center text-app-olive shrink-0 font-bold">
+            <i class="fa-solid ${isDone ? 'fa-check text-green-700' : (isFailed ? 'fa-triangle-exclamation text-red-500' : 'fa-cloud-arrow-down')}"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-bold text-app-ink truncate">${q.title || q.name}</p>
+            <p class="text-[11px] text-app-muted truncate">${q.artist || (q.status + '...')}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 w-full sm:w-auto sm:min-w-[280px]">
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-app-ink/5 border border-app-line text-app-ink shrink-0">${q.format}</span>
+          
+          <div class="relative flex-1 h-2 rounded-full bg-app-ink/10 overflow-hidden">
+            <div id="dl-card-${idx}-fill" class="h-full rounded-full ${isDone ? 'bg-green-600' : (isFailed ? 'bg-red-500' : 'scrub-fill')} transition-all duration-300" style="width:${q.progress}%"></div>
+          </div>
+          
+          <span id="dl-card-${idx}-pct" class="text-xs font-mono font-bold w-12 text-right shrink-0 ${isDone ? 'text-green-700' : (isFailed ? 'text-red-500' : 'text-app-olive')}">${Math.round(q.progress)}%</span>
+
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusBadgeClass}">${q.status}</span>
+
+          ${isRunning && q.jobId ? `
+            <button onclick="event.stopPropagation(); cancelDownload(${idx})" title="Cancel download" class="w-7 h-7 rounded-full flex items-center justify-center bg-app-ink/5 border border-app-line text-app-muted hover:text-red-500 hover:border-red-400 transition shrink-0 cursor-pointer">
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+          ` : `
+            <button onclick="event.stopPropagation(); dismissQueueItem(${idx})" title="Remove from list" class="w-7 h-7 rounded-full flex items-center justify-center bg-red-50 hover:bg-red-100 border border-red-200 text-red-500 hover:text-red-700 transition shrink-0 cursor-pointer">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function dismissQueueItem(idx) {
+  if (idx >= 0 && idx < App.queue.length) {
+    App.queue.splice(idx, 1);
+    renderQueueAndLibrary();
+    renderDownloadModalRows();
+  }
+}
+
+function clearFinishedDownloads() {
+  App.queue = App.queue.filter(q => q.status === 'Downloading' || q.status === 'Queued' || q.status === 'Processing');
+  renderQueueAndLibrary();
+  renderDownloadModalRows();
+}
+
+let currentTrackPreviewData = null;
+let selectedTrackFormat = 'mp3';
+
+async function openTrackFormatModal(query) {
   if (!query || !query.trim()) return;
   const qStr = query.trim();
 
+  const btn = document.getElementById('paste-fetch-btn');
+  const oldHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i><span class="hidden sm:inline">Inspecting...</span>`;
+    btn.disabled = true;
+  }
+
+  document.getElementById('telemetry-status').innerText = '⚡ INSPECTING STREAM';
+
+  try {
+    const res = await fetch('/api/track/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: qStr })
+    });
+    const data = await res.json();
+    if (data.status !== 'success') {
+      alert(data.error || 'Failed to inspect song stream quality');
+      return;
+    }
+    currentTrackPreviewData = data;
+    renderTrackFormatModal(data);
+  } catch (err) {
+    console.error('Track preview inspection failed:', err);
+    alert('Error inspecting song: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
+    document.getElementById('telemetry-status').innerText = 'IDLE';
+  }
+}
+
+function renderTrackFormatModal(data) {
+  const modal = document.getElementById('track-format-modal');
+  if (!modal) return;
+
+  document.getElementById('tf-title').innerText = data.title || 'Unknown Title';
+  document.getElementById('tf-artist').innerText = data.artist || 'Unknown Artist';
+  document.getElementById('tf-duration').innerText = data.duration_fmt || '—';
+  
+  const sourceBadge = document.getElementById('tf-source-badge');
+  if (sourceBadge) {
+    sourceBadge.innerText = (data.source || 'YOUTUBE').toUpperCase();
+  }
+
+  const qualityBadge = document.getElementById('tf-quality-badge');
+  if (qualityBadge) {
+    qualityBadge.innerText = `Detected Bitrate: ${data.max_abr || 128} kbps`;
+  }
+
+  const img = document.getElementById('tf-cover');
+  const fb = document.getElementById('tf-cover-fallback');
+  if (data.cover_url) {
+    img.src = data.cover_url;
+    img.classList.remove('hidden');
+    fb.classList.add('hidden');
+  } else {
+    img.classList.add('hidden');
+    fb.classList.remove('hidden');
+  }
+
+  // Pre-select highest available format (as determined in user interview)
+  selectedTrackFormat = data.default_format || 'mp3';
+
+  renderTrackFormatCards();
+  modal.classList.remove('hidden');
+}
+
+function renderTrackFormatCards() {
+  const container = document.getElementById('tf-formats-container');
+  if (!container || !currentTrackPreviewData) return;
+
+  const formats = currentTrackPreviewData.formats || [];
+  container.innerHTML = formats.map(f => {
+    const isAvail = f.available !== false;
+    const isSelected = selectedTrackFormat === f.id;
+
+    if (!isAvail) {
+      return `
+        <div class="flex items-center justify-between p-3.5 rounded-2xl border border-app-line/60 bg-app-ink/[0.02] opacity-45 cursor-not-allowed select-none transition">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-full bg-app-ink/5 flex items-center justify-center text-app-muted text-xs shrink-0">
+              <i class="fa-solid fa-ban"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-app-muted">${f.name}</span>
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-red-100 text-red-700">UNAVAILABLE</span>
+              </div>
+              <p class="text-[10px] text-app-muted truncate">${f.reason || 'Source stream quality too low'}</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono text-app-muted/70 shrink-0">Disabled</span>
+        </div>
+      `;
+    }
+
+    return `
+      <div onclick="selectTrackFormat('${f.id}')" class="flex items-center justify-between p-3.5 rounded-2xl border transition cursor-pointer ${isSelected ? 'border-app-olive bg-app-olive/10 shadow-sm olive-glow' : 'border-app-line bg-white hover:border-app-olive/40 hover:bg-app-olive/[0.03]'}">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs shrink-0 ${isSelected ? 'bg-app-olive text-white' : 'bg-app-olive/15 text-app-olive'}">
+            <i class="fa-solid ${isSelected ? 'fa-circle-check' : 'fa-music'}"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold ${isSelected ? 'text-app-oliveDeep' : 'text-app-ink'}">${f.name}</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded ${isSelected ? 'bg-app-olive text-white' : 'bg-app-ink/5 text-app-muted'}">${f.badge}</span>
+            </div>
+            <p class="text-[10px] text-app-muted truncate">${f.sub}</p>
+          </div>
+        </div>
+        <div class="text-right shrink-0">
+          <span class="text-[11px] font-mono font-semibold ${isSelected ? 'text-app-olive' : 'text-app-muted'}">${f.est_size}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const btnLabel = document.getElementById('tf-btn-label');
+  if (btnLabel) {
+    const activeFmtObj = formats.find(f => f.id === selectedTrackFormat);
+    btnLabel.innerText = `Download (${activeFmtObj ? activeFmtObj.name : selectedTrackFormat.toUpperCase()})`;
+  }
+}
+
+function selectTrackFormat(fmtId) {
+  if (!currentTrackPreviewData) return;
+  const targetFmt = (currentTrackPreviewData.formats || []).find(f => f.id === fmtId);
+  if (!targetFmt || targetFmt.available === false) return;
+  selectedTrackFormat = fmtId;
+  renderTrackFormatCards();
+}
+
+function closeTrackFormatModal() {
+  const modal = document.getElementById('track-format-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function confirmTrackDownload() {
+  if (!currentTrackPreviewData) return;
+  const url = currentTrackPreviewData.url;
+  const title = currentTrackPreviewData.title;
+  const artist = currentTrackPreviewData.artist;
+  const fmt = selectedTrackFormat || 'mp3';
+
+  closeTrackFormatModal();
+  document.getElementById('url-input').value = '';
+  triggerDownload(url, title, artist, fmt);
+}
+
+async function openPlaylistPreview(url) {
+  const btn = document.getElementById('paste-fetch-btn');
+  const oldHtml = btn.innerHTML;
+  btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i><span class="hidden sm:inline">Fetching...</span>`;
+  btn.disabled = true;
+
+  document.getElementById('telemetry-status').innerText = '⚡ FETCHING PLAYLIST';
+
+  try {
+    const res = await fetch('/api/playlist/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url.trim() })
+    });
+    const data = await res.json();
+    if (data.status !== 'success') {
+      alert(data.error || 'Failed to load playlist preview');
+      return;
+    }
+    currentPlaylistData = data;
+    renderPlaylistPreviewModal(data);
+  } catch (err) {
+    console.error('Playlist preview failed:', err);
+    alert('Error loading playlist preview: ' + err.message);
+  } finally {
+    btn.innerHTML = oldHtml;
+    btn.disabled = false;
+    document.getElementById('telemetry-status').innerText = 'IDLE';
+  }
+}
+
+function renderPlaylistPreviewModal(data) {
+  const modal = document.getElementById('playlist-preview-modal');
+  if (!modal) return;
+
+  document.getElementById('pl-preview-title').innerText = data.title || 'Playlist Preview';
+  document.getElementById('pl-preview-subtitle').innerText = data.subtitle || (data.source === 'spotify' ? 'Spotify' : 'YouTube');
+  document.getElementById('pl-preview-badge').innerText = `${data.source.toUpperCase()} ${data.type ? data.type.toUpperCase() : 'PLAYLIST'}`;
+  document.getElementById('pl-preview-count').innerText = `${data.total} songs`;
+  document.getElementById('pl-total-count').innerText = data.total;
+
+  const img = document.getElementById('pl-preview-cover');
+  const fb = document.getElementById('pl-preview-cover-fallback');
+  if (data.cover_url) {
+    img.src = data.cover_url;
+    img.classList.remove('hidden');
+    fb.classList.add('hidden');
+  } else {
+    img.classList.add('hidden');
+    fb.classList.remove('hidden');
+  }
+
+  // Set default global format active button
+  const activeFmt = App.format || 'bluray';
+  setPlaylistGlobalFormat(activeFmt, false);
+
+  const container = document.getElementById('pl-tracks-container');
+  const rows = (data.tracks || []).map((t, idx) => {
+    const availFmts = t.available_formats || ['mp3', 'flac', 'bluray'];
+    const curFmt = t.default_format || activeFmt;
+
+    const fmtOptions = [
+      { id: 'mp3', label: 'MP3 320k' },
+      { id: 'flac', label: 'FLAC Lossless' },
+      { id: 'bluray', label: 'BluRay Hi-Res 96/24' }
+    ].map(f => {
+      const isAvail = availFmts.includes(f.id);
+      const isSelected = curFmt === f.id;
+      return `<option value="${f.id}" ${!isAvail ? 'disabled' : ''} ${isSelected ? 'selected' : ''}>${f.label}${!isAvail ? ' (Unavailable)' : ''}</option>`;
+    }).join('');
+
+    return `
+      <div id="pl-track-row-${idx}" class="pl-track-row flex items-center justify-between gap-3 p-3 rounded-2xl border transition bg-white/70 border-app-line hover:border-app-olive/40 hover:bg-app-olive/[0.04]">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <input type="checkbox" id="pl-chk-${idx}" checked data-idx="${idx}" onchange="updatePlaylistSelectionCount()" class="pl-track-chk w-4 h-4 rounded text-app-olive focus:ring-app-olive cursor-pointer accent-app-olive">
+          <span class="text-xs font-mono text-app-muted w-6 text-right shrink-0">${idx + 1}</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-app-ink truncate">${t.title}</p>
+            <p class="text-[11px] text-app-muted truncate">${t.artist}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <span class="text-xs font-mono text-app-muted">${t.duration_fmt || '—'}</span>
+          <select id="pl-fmt-select-${idx}" data-idx="${idx}" class="pl-track-fmt text-[11px] font-semibold bg-white border border-app-line rounded-xl px-2.5 py-1.5 text-app-ink outline-none focus:border-app-olive cursor-pointer">
+            ${fmtOptions}
+          </select>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = rows;
+  updatePlaylistSelectionCount();
+  modal.classList.remove('hidden');
+}
+
+function togglePlaylistSelectAll() {
+  const chks = document.querySelectorAll('.pl-track-chk');
+  const allChecked = Array.from(chks).every(c => c.checked);
+  chks.forEach(c => c.checked = !allChecked);
+  updatePlaylistSelectionCount();
+}
+
+function updatePlaylistSelectionCount() {
+  const chks = document.querySelectorAll('.pl-track-chk');
+  const selectedCount = Array.from(chks).filter(c => c.checked).length;
+  const totalCount = chks.length;
+  
+  const selEl = document.getElementById('pl-selected-count');
+  const btnEl = document.getElementById('pl-btn-count');
+  const allBtnText = document.getElementById('pl-select-all-text');
+  const allBtnIcon = document.getElementById('pl-select-all-icon');
+  const dlBtn = document.getElementById('pl-download-btn');
+
+  if (selEl) selEl.innerText = selectedCount;
+  if (btnEl) btnEl.innerText = selectedCount;
+  
+  if (allBtnText && allBtnIcon) {
+    if (selectedCount === totalCount && totalCount > 0) {
+      allBtnText.innerText = 'Deselect All';
+      allBtnIcon.className = 'fa-regular fa-square-check text-app-olive';
+    } else {
+      allBtnText.innerText = 'Select All';
+      allBtnIcon.className = 'fa-regular fa-square text-app-muted';
+    }
+  }
+
+  if (dlBtn) {
+    dlBtn.disabled = selectedCount === 0;
+    dlBtn.classList.toggle('opacity-50', selectedCount === 0);
+    dlBtn.classList.toggle('cursor-not-allowed', selectedCount === 0);
+  }
+}
+
+function setPlaylistGlobalFormat(fmt, updateSelects = true) {
+  document.querySelectorAll('.pl-fmt-btn').forEach(b => {
+    b.className = 'pl-fmt-btn px-3 py-1 rounded-full text-app-muted hover:text-app-ink transition';
+  });
+  const btn = document.getElementById(`pl-fmt-${fmt}`);
+  if (btn) btn.className = 'pl-fmt-btn active px-3 py-1 rounded-full border border-app-olive bg-app-olive/15 text-app-ink font-semibold';
+
+  if (updateSelects) {
+    document.querySelectorAll('.pl-track-fmt').forEach(sel => {
+      const opt = sel.querySelector(`option[value="${fmt}"]`);
+      if (opt && !opt.disabled) {
+        sel.value = fmt;
+      }
+    });
+  }
+}
+
+function closePlaylistPreviewModal() {
+  const modal = document.getElementById('playlist-preview-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function startPlaylistDownload() {
+  if (!currentPlaylistData || !currentPlaylistData.tracks) return;
+
+  const chks = document.querySelectorAll('.pl-track-chk');
+  const selectedTracks = [];
+
+  chks.forEach(chk => {
+    if (chk.checked) {
+      const idx = parseInt(chk.dataset.idx, 10);
+      const t = currentPlaylistData.tracks[idx];
+      const fmtSelect = document.getElementById(`pl-fmt-select-${idx}`);
+      const chosenFmt = fmtSelect ? fmtSelect.value : (App.format || 'bluray');
+      
+      selectedTracks.push({
+        query: t.url || `${t.artist} ${t.title}`.trim(),
+        title: t.title,
+        artist: t.artist,
+        format: chosenFmt
+      });
+    }
+  });
+
+  if (selectedTracks.length === 0) return;
+
+  closePlaylistPreviewModal();
+  document.getElementById('url-input').value = '';
+
+  // Open the Download Progress Window immediately!
+  toggleDownloadModal(true);
+
+  // Send batch playlist download
+  try {
+    const res = await fetch('/api/playlist/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tracks: selectedTracks,
+        format: App.format,
+        quality: App.quality
+      })
+    });
+    const data = await res.json();
+    if (data.status !== 'queued' || !data.jobs) throw new Error(data.error || 'Failed to queue playlist tracks');
+
+    // Register each job in App.queue and attach SSE listeners
+    data.jobs.forEach(j => {
+      const qItem = {
+        name: (j.title || j.query).substring(0, 40),
+        title: j.title,
+        artist: j.artist,
+        format: (j.format || 'bluray').toUpperCase(),
+        speed: '—',
+        status: 'Queued',
+        progress: 0,
+        jobId: j.job_id
+      };
+      App.queue.unshift(qItem);
+      renderQueueAndLibrary();
+      renderDownloadModalRows();
+
+      const es = new EventSource(`/api/jobs/${j.job_id}/events`);
+      es.onmessage = (msg) => {
+        let ev;
+        try { ev = JSON.parse(msg.data); } catch { return; }
+        if (ev.status === 'downloading') {
+          qItem.progress = ev.percent || 0;
+          qItem.status = 'Downloading';
+          markQueueProgress(qItem);
+          renderDownloadModalRows();
+        } else if (ev.status === 'finished') {
+          qItem.progress = 95;
+          qItem.status = 'Processing';
+          renderQueueAndLibrary();
+          renderDownloadModalRows();
+        } else if (ev.status === 'job_end') {
+          es.close();
+          qItem.progress = 100;
+          const isDone = ev.job_status === 'done' || ev.result_status === 'success' || ev.result_status === 'skipped';
+          const isCancelled = ev.job_status === 'cancelled' || ev.result_status === 'cancelled';
+          qItem.status = isDone ? 'Done' : (isCancelled ? 'Cancelled' : 'Failed');
+          finishQueueItem(qItem);
+        }
+      };
+      es.onerror = () => { es.close(); };
+    });
+
+  } catch (err) {
+    console.error('Playlist download queue error:', err);
+    alert('Failed to start playlist download: ' + err.message);
+  }
+}
+
+// 6. Download Trigger (async job queue + live SSE progress)
+async function triggerDownload(query, customTitle, customArtist, customFormat) {
+  if (!query || !query.trim()) return;
+  const qStr = query.trim();
+  const chosenFormat = customFormat || App.format || 'bluray';
+
   const qItem = {
-    name: qStr.substring(0, 40),
-    format: App.format.toUpperCase(),
+    name: (customTitle || qStr).substring(0, 40),
+    title: customTitle || qStr,
+    artist: customArtist || '',
+    format: chosenFormat.toUpperCase(),
     speed: '—',
     status: 'Queued',
     progress: 0,
@@ -825,6 +1799,10 @@ async function triggerDownload(query) {
   };
   App.queue.unshift(qItem);
   renderQueueAndLibrary();
+  renderDownloadModalRows();
+
+  // Open the Download Center window automatically!
+  toggleDownloadModal(true);
 
   document.getElementById('telemetry-status').innerText = `⚡ DOWNLOADING`;
   document.getElementById('telemetry-dot').classList.add('pulse-dot');
@@ -834,7 +1812,14 @@ async function triggerDownload(query) {
     const res = await fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: qStr, format: App.format, quality: App.quality, mode: 'async' })
+      body: JSON.stringify({
+        query: qStr,
+        title: customTitle || qStr,
+        artist: customArtist || '',
+        format: chosenFormat,
+        quality: App.quality,
+        mode: 'async'
+      })
     });
     const data = await res.json();
     if (data.status !== 'queued' || !data.job_id) throw new Error(data.error || 'Queue failed');
@@ -842,6 +1827,7 @@ async function triggerDownload(query) {
     qItem.jobId = jobId;
     qItem.status = 'Downloading';
     renderQueueAndLibrary();
+    renderDownloadModalRows();
   } catch (e) {
     qItem.progress = 100;
     qItem.status = 'Failed';
@@ -856,16 +1842,19 @@ async function triggerDownload(query) {
     if (ev.status === 'downloading') {
       qItem.progress = ev.percent || 0;
       qItem.status = 'Downloading';
-      renderQueueAndLibrary();
+      markQueueProgress(qItem);
+      renderDownloadModalRows();
     } else if (ev.status === 'finished') {
       qItem.progress = 95;
       qItem.status = 'Processing';
       renderQueueAndLibrary();
+      renderDownloadModalRows();
     } else if (ev.status === 'job_end') {
       es.close();
       qItem.progress = 100;
-      qItem.status = ev.job_status === 'done' ? 'Done'
-        : (ev.job_status === 'cancelled' ? 'Cancelled' : 'Failed');
+      const isDone = ev.job_status === 'done' || ev.result_status === 'success' || ev.result_status === 'skipped';
+      const isCancelled = ev.job_status === 'cancelled' || ev.result_status === 'cancelled';
+      qItem.status = isDone ? 'Done' : (isCancelled ? 'Cancelled' : 'Failed');
       finishQueueItem(qItem);
     }
   };
@@ -874,11 +1863,12 @@ async function triggerDownload(query) {
 
 function finishQueueItem(qItem) {
   renderQueueAndLibrary();
+  renderDownloadModalRows();
   loadLibrary();
   setTimeout(() => {
-    App.queue = App.queue.filter(q => q !== qItem);
     renderQueueAndLibrary();
-    if (!App.queue.some(q => q.status === 'Downloading' || q.status === 'Queued')) {
+    renderDownloadModalRows();
+    if (!App.queue.some(q => q.status === 'Downloading' || q.status === 'Queued' || q.status === 'Processing')) {
       document.getElementById('telemetry-status').innerText = 'IDLE';
     }
   }, 4000);
@@ -891,6 +1881,7 @@ async function cancelDownload(idx) {
     await fetch(`/api/jobs/${qItem.jobId}/cancel`, { method: 'POST' });
     qItem.status = 'Cancelling…';
     renderQueueAndLibrary();
+    renderDownloadModalRows();
   } catch (e) {
     console.error(e);
   }
@@ -915,7 +1906,77 @@ async function deleteTrack(encodedFilename) {
 // 8. Fullscreen Subtitles Toggle (True Hardware / Browser Fullscreen)
 let fsIdleTimer = null;
 
-function toggleFullscreenLyrics(show) {
+// Spotify-style fullscreen view switcher: big HD artwork vs karaoke lyrics
+function setFsTab(tab) {
+  App.fsTab = tab === 'nowplaying' ? 'nowplaying' : 'lyrics';
+  const isNp = App.fsTab === 'nowplaying';
+  const np = document.getElementById('fs-nowplaying');
+  const lyr = document.getElementById('fs-lyrics-stream');
+  const langGroup = document.getElementById('fs-lang-group');
+  if (np) np.classList.toggle('hidden', !isNp);
+  if (lyr) lyr.classList.toggle('hidden', isNp);
+  if (langGroup) langGroup.classList.toggle('hidden', isNp);
+
+  document.querySelectorAll('.fs-tab-btn').forEach(b => {
+    b.className = 'fs-tab-btn px-3.5 py-1.5 rounded-full text-app-muted hover:text-app-ink cursor-pointer transition whitespace-nowrap';
+  });
+  const active = document.getElementById(isNp ? 'fs-tab-nowplaying' : 'fs-tab-lyrics');
+  if (active) active.className = 'fs-tab-btn px-3.5 py-1.5 rounded-full border border-app-olive bg-app-olive/15 text-app-ink font-semibold olive-glow cursor-pointer transition whitespace-nowrap';
+
+  const tools = document.getElementById('fs-lyric-tools');
+  if (tools) { tools.classList.toggle('hidden', isNp); tools.classList.toggle('flex', !isNp); }
+  const qBtn = document.getElementById('fs-queue-toggle');
+  if (qBtn) { qBtn.classList.toggle('hidden', !isNp); qBtn.classList.toggle('flex', isNp); }
+
+  if (isNp) {
+    if (window.FsCoverflowEngine) {
+      FsCoverflowEngine.render();
+      FsCoverflowEngine.goTo(App.currentIndex || 0, false);
+      setTimeout(() => {
+        FsCoverflowEngine.measure();
+        FsCoverflowEngine.paint();
+      }, 50);
+    }
+    renderFsQueue();
+    scrollFsQueueToCurrent();
+  }
+  else updateLyricsHighlight(audio.currentTime || 0);
+}
+
+// Up Next side-list visibility (persisted)
+function applyNpQueueVisibility() {
+  const panel = document.getElementById('fs-np-queue');
+  if (!panel) return;
+  panel.style.display = App.npQueueVisible ? '' : 'none';
+  const btn = document.getElementById('fs-queue-toggle');
+  if (btn) {
+    btn.classList.toggle('text-app-olive', App.npQueueVisible);
+    btn.classList.toggle('border-app-olive/60', App.npQueueVisible);
+    btn.classList.toggle('text-app-muted', !App.npQueueVisible);
+  }
+}
+
+function toggleNpQueue() {
+  App.npQueueVisible = !App.npQueueVisible;
+  try { localStorage.setItem('auradisc-np-queue', App.npQueueVisible ? '1' : '0'); } catch (e) {}
+  applyNpQueueVisibility();
+  if (App.npQueueVisible) { renderFsQueue(); scrollFsQueueToCurrent(); }
+}
+
+function updateFsNowPlayingMeta() {
+  const t = document.getElementById('fs-np-title');
+  const a = document.getElementById('fs-np-artist');
+  if (!t || !a) return;
+  if (App.currentTrack) {
+    t.innerText = App.currentTrack.title;
+    a.innerText = `${App.currentTrack.artist} · ${App.currentTrack.format}`;
+  } else {
+    t.innerText = 'No Song Playing';
+    a.innerText = 'AuraDisc Pro';
+  }
+}
+
+function toggleFullscreenLyrics(show, tab) {
   const modal = document.getElementById('fullscreen-lyrics-modal');
   if (show === undefined) {
     show = modal.classList.contains('hidden');
@@ -923,7 +1984,18 @@ function toggleFullscreenLyrics(show) {
 
   if (show) {
     modal.classList.remove('hidden');
+    setFsTab(tab || App.fsTab);
     renderFullscreenLyrics();
+    updateFsNowPlayingMeta();
+    if (window.FsCoverflowEngine) {
+      FsCoverflowEngine.render();
+      FsCoverflowEngine.goTo(App.currentIndex || 0, false);
+      setTimeout(() => {
+        FsCoverflowEngine.measure();
+        FsCoverflowEngine.paint();
+      }, 50);
+    }
+    if (window.DiscEngine) DiscEngine.setHidden(true);
     if (App.currentTrack) {
       document.getElementById('fs-track-title').innerText = App.currentTrack.title;
       document.getElementById('fs-track-artist').innerText = `${App.currentTrack.artist} · ${App.currentTrack.format}`;
@@ -944,6 +2016,13 @@ function toggleFullscreenLyrics(show) {
     }
   } else {
     modal.classList.add('hidden');
+    if (window.DiscEngine && currentStageMode === 'vinyl') DiscEngine.setHidden(false);
+    if (window.CoverflowEngine && currentStageMode === 'coverflow') {
+      setTimeout(() => {
+        CoverflowEngine.measure();
+        CoverflowEngine.paint();
+      }, 50);
+    }
     try {
       if (document.fullscreenElement || document.webkitFullscreenElement) {
         if (document.exitFullscreen) {
@@ -1184,52 +2263,91 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Paste & Fetch button
   document.getElementById('paste-fetch-btn').addEventListener('click', async () => {
+    let q = '';
     try {
       const text = await navigator.clipboard.readText();
-      if (text) {
-        document.getElementById('url-input').value = text;
-        triggerDownload(text);
+      if (text && text.trim()) {
+        q = text.trim();
+        document.getElementById('url-input').value = q;
       }
-    } catch (e) {
-      const q = document.getElementById('url-input').value;
-      if (q) triggerDownload(q);
+    } catch (e) {}
+
+    if (!q) q = (document.getElementById('url-input').value || '').trim();
+    if (!q) return;
+
+    if (isPlaylistUrl(q)) {
+      openPlaylistPreview(q);
+    } else {
+      openTrackFormatModal(q);
     }
   });
 
   // Enter key on input
   document.getElementById('url-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      const q = document.getElementById('url-input').value;
-      triggerDownload(q);
-      document.getElementById('url-input').value = '';
+      const q = (document.getElementById('url-input').value || '').trim();
+      if (!q) return;
+      if (isPlaylistUrl(q)) {
+        openPlaylistPreview(q);
+      } else {
+        openTrackFormatModal(q);
+      }
     }
   });
 
-  // Format toggles
-  document.querySelectorAll('.format-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.format-btn').forEach(b => {
-        b.className = 'format-btn px-3 sm:px-4 py-2.5 rounded-full text-app-muted hover:text-app-ink transition whitespace-nowrap';
-      });
-      btn.className = 'format-btn active px-3 sm:px-4 py-2.5 rounded-full border border-app-olive olive-glow bg-app-olive/15 text-app-ink font-semibold whitespace-nowrap';
-      App.format = btn.dataset.format;
-      App.quality = btn.dataset.quality;
-    });
-  });
-
-  // Language buttons (Main Panel)
-  document.getElementById('lang-dual').addEventListener('click', () => updateLangButtons('dual'));
-  document.getElementById('lang-urdu').addEventListener('click', () => updateLangButtons('urdu'));
-  document.getElementById('lang-eng').addEventListener('click', () => updateLangButtons('eng'));
-
-  // Language buttons (Fullscreen)
+  // Language buttons (Fullscreen — main-page panel was removed)
   document.getElementById('fs-lang-dual').addEventListener('click', () => updateLangButtons('dual'));
   document.getElementById('fs-lang-urdu').addEventListener('click', () => updateLangButtons('urdu'));
   document.getElementById('fs-lang-eng').addEventListener('click', () => updateLangButtons('eng'));
 
   // Fullscreen toggle buttons
-  document.getElementById('fullscreen-lyrics-btn').addEventListener('click', () => toggleFullscreenLyrics(true));
+  document.getElementById('fullscreen-lyrics-btn').addEventListener('click', () => toggleFullscreenLyrics(true, 'lyrics'));
+  document.getElementById('fullscreen-np-btn').addEventListener('click', () => toggleFullscreenLyrics(true, 'nowplaying'));
+  document.getElementById('fs-tab-nowplaying').addEventListener('click', () => setFsTab('nowplaying'));
+  document.getElementById('fs-tab-lyrics').addEventListener('click', () => setFsTab('lyrics'));
   document.getElementById('close-fs-lyrics').addEventListener('click', () => toggleFullscreenLyrics(false));
+
+  // Up Next side-list visibility toggle (persisted)
+  App.npQueueVisible = (() => { try { return localStorage.getItem('auradisc-np-queue') !== '0'; } catch (e) { return true; } })();
+  applyNpQueueVisibility();
+  document.getElementById('fs-queue-toggle').addEventListener('click', toggleNpQueue);
+
+  // Deep-link: #fs opens fullscreen lyrics, #np opens Now Playing
+  if (location.hash === '#fs' || location.hash === '#np') {
+    toggleFullscreenLyrics(true, location.hash === '#np' ? 'nowplaying' : 'lyrics');
+  }
+
+  // Retro theme picker (persisted in localStorage, drives the whole app + disc)
+  buildThemeMenu();
+  applyTheme((() => { try { return localStorage.getItem('auradisc-theme'); } catch (e) { return null; } })() || 'olive', false);
+  document.getElementById('theme-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('theme-menu').classList.toggle('hidden');
+  });
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('theme-menu');
+    if (menu && !menu.classList.contains('hidden') && !menu.contains(e.target) && !e.target.closest('#theme-btn')) {
+      menu.classList.add('hidden');
+    }
+  });
+
+  // 3D hover tilt on the Now Playing artwork card (cursor-follow, springs back on leave)
+  const artCard = document.getElementById('fs-art-card');
+  if (artCard && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const TILT = 9; // max degrees each direction
+    artCard.addEventListener('mousemove', (e) => {
+      const r = artCard.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      artCard.style.transition = 'transform .08s ease-out';
+      artCard.style.transform = `rotateY(${(px * TILT * 2).toFixed(2)}deg) rotateX(${(-py * TILT * 2).toFixed(2)}deg) scale(1.035)`;
+    });
+    artCard.addEventListener('mouseleave', () => {
+      artCard.style.transition = 'transform .55s cubic-bezier(.22,1,.36,1)';
+      artCard.style.transform = 'rotateY(0deg) rotateX(0deg) scale(1)';
+    });
+  }
 
   // Auto-hiding fullscreen controls on mouse idle
   const fsModal = document.getElementById('fullscreen-lyrics-modal');
@@ -1275,7 +2393,15 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('keydown', (e) => {
     const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
     if (e.key === 'Escape') {
+      closeTrackFormatModal();
+      closePlaylistPreviewModal();
       toggleFullscreenLyrics(false);
+    } else if (e.key === 'Enter') {
+      const tfModal = document.getElementById('track-format-modal');
+      if (tfModal && !tfModal.classList.contains('hidden')) {
+        e.preventDefault();
+        confirmTrackDownload();
+      }
     } else if ((e.key === 'f' || e.key === 'F') && !typing) {
       toggleFullscreenLyrics();
     } else if (!typing) {
@@ -1296,6 +2422,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (App.currentIndex + 1 < App.library.length) playTrack(App.currentIndex + 1);
       } else if (e.key === 'p' || e.key === 'P') {
         if (App.currentIndex > 0) playTrack(App.currentIndex - 1);
+      } else if (e.key === 'v' || e.key === 'V') {
+        toggleFullscreenLyrics(true, 'nowplaying');
       }
     }
   });
@@ -1316,7 +2444,6 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ purge_all: true })
       });
-      document.getElementById('lyrics-status-text').innerText = 'Rebuilding all lyrics in background…';
     } finally {
       btn.style.opacity = '1';
     }
@@ -1367,20 +2494,46 @@ document.addEventListener('DOMContentLoaded', () => {
 // DISC ENGINE — Three.js WebGL turntable + Web Audio orbital particles
 // ============================================================================
 const DiscEngine = (() => {
-  const OLIVE = 0x6b8e23, OLIVE_DEEP = 0x4a6516, INK = 0x2c331d;
+  // Theme-aware palette: seeded from the app's CSS variables (retro theme picker)
+  const cssRgb = (name, fb) => {
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim().split(/\s+/).map(Number);
+      if (v.length === 3 && v.every(n => Number.isFinite(n))) return (v[0] << 16) | (v[1] << 8) | v[2];
+    } catch (e) {}
+    return fb;
+  };
+  let OLIVE = cssRgb('--t-accent', 0x6b8e23), OLIVE_DEEP = cssRgb('--t-accent-deep', 0x4a6516);
+  let INK = cssRgb('--t-ink', 0x2c331d), OLIVE_SOFT = cssRgb('--t-accent-soft', 0x93b23f);
+  let labelCols = { deep: '#4a6516', muted: 'rgba(44,51,29,.47)', ink: '#2c331d', ring: 'rgba(107,142,35,0.55)', grad: '#eef2e0' };
   const REDUCED_MOTION = typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let scene, camera, renderer, pivot, discGroup, topMat, laserMat;
-  let labelCanvas, labelTexture, particles, particleGeo, particleData;
+  let scene, camera, renderer, pivot, discGroup, topMat, laserMat, edgeMat, hubSideMat;
+  let labelCanvas, labelTexture, particles, particleGeo, particleData, laserLight, rimLight;
   let audioCtx, analyser, freqData;
   let ready = false, playing = false, spinSpeed = 0;
   let tiltTX = 0, tiltTZ = 0;
   let transPhase = 'idle', transT = 0, pendingLabel = null;
+  let inView = true, covered = false; // render only when the stage is on-screen & not under the fullscreen modal
   const clock = { last: performance.now() };
 
   function init() {
     const stage = document.getElementById('webgl-stage');
     if (!stage || !window.THREE) { fallback(); return; }
+
+    // Sync label palette with whatever retro theme is active on load
+    try {
+      const v = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim().split(/\s+/).map(Number);
+      const a = v('--t-accent'), d = v('--t-accent-deep'), ik = v('--t-ink'), b3 = v('--t-bg-3');
+      if ([a, d, ik, b3].every(x => x.length === 3 && x.every(n => Number.isFinite(n)))) {
+        labelCols = {
+          deep: `rgb(${d.join(',')})`,
+          muted: `rgba(${ik.join(',')},0.47)`,
+          ink: `rgb(${ik.join(',')})`,
+          ring: `rgba(${a.join(',')},0.55)`,
+          grad: `rgb(${b3.join(',')})`
+        };
+      }
+    } catch (e) {}
 
     try {
       scene = new THREE.Scene();
@@ -1388,29 +2541,43 @@ const DiscEngine = (() => {
       camera.position.set(0, 4.5, 7.0);
       camera.lookAt(0, 0, 0);
 
-      renderer = new THREE.WebGLRenderer({ canvas: stage, antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({ canvas: stage, antialias: true, alpha: true, powerPreference: 'low-power' });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 
       scene.add(new THREE.AmbientLight(0xffffff, 0.85));
       const key = new THREE.DirectionalLight(0xffffff, 0.55);
       key.position.set(3, 6, 5);
       scene.add(key);
-      const rim = new THREE.PointLight(0x93b23f, 0.6, 30);
+      const rim = new THREE.PointLight(OLIVE_SOFT, 0.6, 30);
       rim.position.set(-5, 2, -3);
       scene.add(rim);
+      rimLight = rim;
 
       pivot = new THREE.Group();
       scene.add(pivot);
 
       buildDisc();
       buildParticles();
+      
+      // Apply active retro theme immediately to disc materials
+      const initialTheme = (typeof THEMES !== 'undefined' && THEMES[App.theme || 'olive']) ? THEMES[App.theme || 'olive'] : null;
+      if (initialTheme) applyThemeToDisc(initialTheme);
+      
       drawLabel('AuraDisc', 'insert a track');
 
       resize();
       new ResizeObserver(resize).observe(stage.parentElement);
 
       const section = document.getElementById('turntable-engine');
+
+      // Perf: stop rendering entirely while the turntable is scrolled out of view
+      if (typeof IntersectionObserver === 'function') {
+        new IntersectionObserver(entries => {
+          inView = entries[0].isIntersecting;
+        }, { threshold: 0.02 }).observe(section);
+      }
+
       if (!REDUCED_MOTION) {
         section.addEventListener('pointermove', (e) => {
           const r = section.getBoundingClientRect();
@@ -1434,11 +2601,17 @@ const DiscEngine = (() => {
     discGroup = new THREE.Group();
     pivot.add(discGroup);
 
-    // Main platter — deep olive-vinyl top with micro-grooves and a slow sage sheen
+    // Main platter — theme-aware vinyl top with micro-grooves and smooth sheen
     const R = 2.55, H = 0.07;
     const geo = new THREE.CylinderGeometry(R, R, H, 128);
     topMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 } },
+      uniforms: {
+        uTime: { value: 0 },
+        uBaseDark: { value: new THREE.Vector3(0.10, 0.125, 0.065) },
+        uBaseLight: { value: new THREE.Vector3(0.185, 0.225, 0.115) },
+        uSheen: { value: new THREE.Vector3(0.20, 0.28, 0.10) },
+        uRim: { value: new THREE.Vector3(0.26, 0.36, 0.13) }
+      },
       vertexShader: `
         varying vec2 vUv;
         void main(){
@@ -1447,26 +2620,30 @@ const DiscEngine = (() => {
         }`,
       fragmentShader: `
         uniform float uTime;
+        uniform vec3 uBaseDark;
+        uniform vec3 uBaseLight;
+        uniform vec3 uSheen;
+        uniform vec3 uRim;
         varying vec2 vUv;
         void main(){
           vec2 p = vUv - 0.5;
           float r = length(p) * 2.0;
           if (r > 1.0) discard;
           float ang = atan(p.y, p.x);
-          // deep olive-ink vinyl base, gently lighter toward the rim
-          vec3 base = mix(vec3(0.10,0.125,0.065), vec3(0.185,0.225,0.115), smoothstep(0.12, 1.0, r));
+          // vinyl base tinted to active theme
+          vec3 base = mix(uBaseDark, uBaseLight, smoothstep(0.12, 1.0, r));
           // micro grooves
           base *= 1.0 + 0.05 * sin(r * 520.0);
-          // soft rotating sage sheen sweeping across the surface
+          // soft rotating sheen sweeping across the surface
           float sheen = pow(0.5 + 0.5*sin(ang*2.0 - uTime*0.35), 4.0);
-          base += vec3(0.20,0.28,0.10) * sheen * (0.25 + 0.45*smoothstep(0.35, 1.0, r));
+          base += uSheen * sheen * (0.25 + 0.45*smoothstep(0.35, 1.0, r));
           // subtle rim light
-          base += vec3(0.26,0.36,0.13) * smoothstep(0.94, 1.0, r) * 0.5;
+          base += uRim * smoothstep(0.94, 1.0, r) * 0.5;
           gl_FragColor = vec4(base, 1.0);
         }`
     });
-    const edge = new THREE.MeshStandardMaterial({ color: 0x232b16, roughness: 0.4, metalness: 0.25 });
-    const platter = new THREE.Mesh(geo, [edge, topMat, edge]);
+    edgeMat = new THREE.MeshStandardMaterial({ color: 0x232b16, roughness: 0.4, metalness: 0.25 });
+    const platter = new THREE.Mesh(geo, [edgeMat, topMat, edgeMat]);
     discGroup.add(platter);
 
     // Spindle hub with procedural label texture
@@ -1475,9 +2652,9 @@ const DiscEngine = (() => {
     labelTexture = new THREE.CanvasTexture(labelCanvas);
     labelTexture.anisotropy = 4;
     const hubGeo = new THREE.CylinderGeometry(0.92, 0.92, 0.16, 64);
-    const hubSide = new THREE.MeshStandardMaterial({ color: 0xd9dfc9, roughness: 0.35, metalness: 0.4 });
+    hubSideMat = new THREE.MeshStandardMaterial({ color: 0xd9dfc9, roughness: 0.35, metalness: 0.4 });
     const hubTop = new THREE.MeshBasicMaterial({ map: labelTexture });
-    const hub = new THREE.Mesh(hubGeo, [hubSide, hubTop, hubSide]);
+    const hub = new THREE.Mesh(hubGeo, [hubSideMat, hubTop, hubSideMat]);
     hub.position.y = H / 2 + 0.08;
     discGroup.add(hub);
 
@@ -1489,7 +2666,7 @@ const DiscEngine = (() => {
     hole.position.y = H / 2 + 0.12;
     discGroup.add(hole);
 
-    // Olive laser pickup tracing the tracks
+    // Theme laser pickup tracing the tracks
     laserMat = new THREE.MeshBasicMaterial({ color: OLIVE, transparent: true, opacity: 0.85 });
     const beam = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.018, 0.018), laserMat);
     beam.position.set(-0.85, H / 2 + 0.03, 1.35);
@@ -1498,17 +2675,17 @@ const DiscEngine = (() => {
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 16), laserMat);
     head.position.set(-1.62, H / 2 + 0.03, 1.78);
     discGroup.add(head);
-    const laserLight = new THREE.PointLight(OLIVE, 0.5, 6);
+    laserLight = new THREE.PointLight(OLIVE, 0.5, 6);
     laserLight.position.copy(head.position);
     discGroup.add(laserLight);
   }
 
   function buildParticles() {
-    const COUNT = 900;
+    const COUNT = 400;
     particleData = [];
     const pos = new Float32Array(COUNT * 3);
     const col = new Float32Array(COUNT * 3);
-    const cOlive = new THREE.Color(OLIVE_DEEP), cSoft = new THREE.Color(0x93b23f), cInk = new THREE.Color(INK);
+    const cOlive = new THREE.Color(OLIVE_DEEP), cSoft = new THREE.Color(OLIVE_SOFT), cInk = new THREE.Color(INK);
     for (let i = 0; i < COUNT; i++) {
       const r = 2.95 + Math.random() * 0.75;
       const th = Math.random() * Math.PI * 2;
@@ -1540,24 +2717,24 @@ const DiscEngine = (() => {
     const ctx = labelCanvas.getContext('2d');
     const S = 512, cx = S / 2;
     const g = ctx.createRadialGradient(cx, cx, 40, cx, cx, 250);
-    g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#eef2e0');
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, labelCols.grad);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, S, S);
-    ctx.strokeStyle = 'rgba(107,142,35,0.55)';
+    ctx.strokeStyle = labelCols.ring;
     ctx.lineWidth = 6;
     ctx.beginPath(); ctx.arc(cx, cx, 236, 0, Math.PI * 2); ctx.stroke();
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(cx, cx, 214, 0, Math.PI * 2); ctx.stroke();
 
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#4a6516';
+    ctx.fillStyle = labelCols.deep;
     ctx.font = 'bold 46px Comfortaa, sans-serif';
     wrapText(ctx, String(title || 'AuraDisc'), cx, cx - 30, 380, 54, 3);
-    ctx.fillStyle = '#79816a';
+    ctx.fillStyle = labelCols.muted;
     ctx.font = '600 30px Comfortaa, sans-serif';
     wrapText(ctx, String(artist || ''), cx, cx + 120, 380, 36, 2);
 
-    ctx.fillStyle = '#2c331d';
+    ctx.fillStyle = labelCols.ink;
     ctx.beginPath(); ctx.arc(cx, cx, 26, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 4;
@@ -1619,6 +2796,8 @@ const DiscEngine = (() => {
   function loop(now) {
     if (!ready) return;
     requestAnimationFrame(loop);
+    // Stage scrolled away or covered by the fullscreen modal — skip all work
+    if (!inView || covered) { clock.last = now; return; }
     const dt = Math.min((now - clock.last) / 1000, 0.05);
     clock.last = now;
     const t = now / 1000;
@@ -1696,18 +2875,800 @@ const DiscEngine = (() => {
     document.fonts.ready.then(() => { if (ready) drawLabel(curTitle, curArtist); }).catch(() => {});
   }
 
+  function applyThemeToDisc(t) {
+    if (!t || !t.accent) return;
+    const hex = a => (a[0] << 16) | (a[1] << 8) | a[2];
+    const [ir, ig, ib] = t.ink, [ar, ag, ab] = t.accent, [dr, dg, db] = t.deep, [sr, sg, sb] = t.soft;
+    OLIVE = hex(t.accent); OLIVE_DEEP = hex(t.deep); OLIVE_SOFT = hex(t.soft); INK = hex(t.ink);
+    labelCols = {
+      deep: `rgb(${t.deep.join(',')})`,
+      muted: `rgba(${ir},${ig},${ib},0.47)`,
+      ink: `rgb(${ir},${ig},${ib})`,
+      ring: `rgba(${ar},${ag},${ab},0.55)`,
+      grad: `rgb(${t.bg3.join(',')})`
+    };
+
+    if (topMat && topMat.uniforms) {
+      // Deep vinyl base tuned to active theme colors
+      topMat.uniforms.uBaseDark.value.set(
+        (ir * 0.4 + dr * 0.6) / 255 * 0.38,
+        (ig * 0.4 + dg * 0.6) / 255 * 0.38,
+        (ib * 0.4 + db * 0.6) / 255 * 0.38
+      );
+      topMat.uniforms.uBaseLight.value.set(
+        (dr * 0.5 + ar * 0.5) / 255 * 0.62,
+        (dg * 0.5 + ag * 0.5) / 255 * 0.62,
+        (db * 0.5 + ab * 0.5) / 255 * 0.62
+      );
+      topMat.uniforms.uSheen.value.set(
+        sr / 255 * 0.85,
+        sg / 255 * 0.85,
+        sb / 255 * 0.85
+      );
+      topMat.uniforms.uRim.value.set(
+        ar / 255 * 0.75,
+        ag / 255 * 0.75,
+        ab / 255 * 0.75
+      );
+    }
+
+    if (edgeMat) edgeMat.color.setRGB(ir / 255 * 0.3, ig / 255 * 0.3, ib / 255 * 0.3);
+    if (hubSideMat) hubSideMat.color.setRGB(t.bg3[0] / 255, t.bg3[1] / 255, t.bg3[2] / 255);
+    if (laserMat) laserMat.color.setHex(OLIVE);
+    if (laserLight) laserLight.color.setHex(OLIVE);
+    if (rimLight) rimLight.color.setHex(OLIVE_SOFT);
+    if (particleGeo && particleData) {
+      const cOlive = new THREE.Color(OLIVE_DEEP), cSoft = new THREE.Color(OLIVE_SOFT), cInk = new THREE.Color(INK);
+      const col = particleGeo.attributes.color;
+      for (let i = 0; i < particleData.length; i++) {
+        const c = particleData[i].band === 0 ? cOlive : (particleData[i].band === 1 ? cSoft : cInk);
+        col.array[i * 3] = c.r; col.array[i * 3 + 1] = c.g; col.array[i * 3 + 2] = c.b;
+      }
+      col.needsUpdate = true;
+    }
+    if (ready) drawLabel(curTitle, curArtist);
+  }
+
   return {
     unlockAudio,
     setPlaying(v) { playing = !!v; },
+    setHidden(v) { covered = !!v; },
     getLabelDataURL() {
       try { return labelCanvas ? labelCanvas.toDataURL('image/png') : null; } catch (e) { return null; }
     },
+    setTheme: applyThemeToDisc,
     setTrack(title, artist) {
       pendingLabel = [title, artist];
       if (ready && transPhase === 'idle') { transPhase = 'out'; transT = 0; }
     }
   };
 })();
+window.DiscEngine = DiscEngine;
+</script>
+
+<script>
+// ============================================================================
+// STAGE MODE SWITCHER (3D Turntable vs 3D Coverflow Deck)
+// ============================================================================
+let currentStageMode = 'vinyl';
+
+function setStageMode(mode) {
+  currentStageMode = mode === 'coverflow' ? 'coverflow' : 'vinyl';
+  const isCoverflow = currentStageMode === 'coverflow';
+
+  const vinylWrap = document.getElementById('disc-wrap');
+  const coverflowWrap = document.getElementById('coverflow-wrap');
+  const tabVinyl = document.getElementById('stage-tab-vinyl');
+  const tabCoverflow = document.getElementById('stage-tab-coverflow');
+
+  if (vinylWrap) vinylWrap.classList.toggle('hidden', isCoverflow);
+  if (coverflowWrap) coverflowWrap.classList.toggle('hidden', !isCoverflow);
+
+  if (tabVinyl) {
+    tabVinyl.className = !isCoverflow
+      ? 'px-3.5 py-1.5 rounded-full text-xs font-semibold border border-app-olive bg-app-olive/15 text-app-ink olive-glow cursor-pointer transition flex items-center gap-1.5'
+      : 'px-3.5 py-1.5 rounded-full text-xs font-semibold text-app-muted hover:text-app-ink cursor-pointer transition flex items-center gap-1.5';
+  }
+  if (tabCoverflow) {
+    tabCoverflow.className = isCoverflow
+      ? 'px-3.5 py-1.5 rounded-full text-xs font-semibold border border-app-olive bg-app-olive/15 text-app-ink olive-glow cursor-pointer transition flex items-center gap-1.5'
+      : 'px-3.5 py-1.5 rounded-full text-xs font-semibold text-app-muted hover:text-app-ink cursor-pointer transition flex items-center gap-1.5';
+  }
+
+  if (window.DiscEngine) DiscEngine.setHidden(isCoverflow);
+  if (isCoverflow && window.CoverflowEngine) {
+    CoverflowEngine.render();
+    CoverflowEngine.goTo(App.currentIndex || 0, false);
+  }
+}
+window.setStageMode = setStageMode;
+
+// ============================================================================
+// 3D COVERFLOW ENGINE FACTORY — Robust, Silky-Smooth Song Slider
+// ============================================================================
+function createCoverflowCarousel({ frameId, containerId, cardClass, maxVisibleDistance = 4.5, onSelect }) {
+  const rotate = 44;
+  const depth = 0.6;
+  const perspective = 3;
+  const falloff = 0.56;
+  const fade = 0.1;
+  const gap = 0.05;
+  const loop = true;
+
+  let frameEl = null;
+  let containerEl = null;
+  let cardEls = [];
+  let pos = 0;
+  let target = 0;
+  let width = 0;
+  let rafId = null;
+  let drag = null;
+  let dragScheduled = false;
+  let selected = 0;
+
+  function count() {
+    return App.library ? App.library.length : 0;
+  }
+
+  function indexAt(p) {
+    const c = count();
+    if (c === 0) return 0;
+    return ((Math.round(p) % c) + c) % c;
+  }
+
+  function clamp(p) {
+    const c = count();
+    if (c === 0) return 0;
+    return loop ? p : Math.max(0, Math.min(c - 1, p));
+  }
+
+  function measure() {
+    if (!frameEl) frameEl = document.getElementById(frameId);
+    let w = 0;
+    for (let i = 0; i < cardEls.length; i++) {
+      if (cardEls[i] && cardEls[i].offsetWidth > 0) {
+        w = cardEls[i].offsetWidth;
+        break;
+      }
+    }
+    if (w > 0) {
+      width = w;
+    } else if (!width) {
+      const frameW = frameEl ? (frameEl.offsetWidth || window.innerWidth) : window.innerWidth;
+      width = Math.min(440, Math.max(170, frameW * 0.25));
+    }
+    paint();
+  }
+
+  function paint() {
+    const c = count();
+    if (c === 0 || !cardEls.length) return;
+    if (!width) measure();
+    if (!width) return;
+    const pitch = width * (1 + gap);
+
+    for (let index = 0; index < cardEls.length; index++) {
+      const card = cardEls[index];
+      if (!card) continue;
+
+      let offset = index - pos;
+      if (loop && c > 1) {
+        offset = ((offset % c) + c) % c;
+        if (offset > c / 2) offset -= c;
+      }
+      const distance = Math.abs(offset);
+
+      if (distance > maxVisibleDistance && c > 7) {
+        card.style.visibility = 'hidden';
+        card.style.opacity = '0';
+        card.style.pointerEvents = 'none';
+        continue;
+      }
+
+      card.style.visibility = 'visible';
+      card.style.pointerEvents = 'auto';
+
+      const ramp = Math.pow(distance, falloff);
+      const tilt = Math.min(rotate * ramp, 82) * Math.sign(offset);
+
+      card.style.transform = `translateX(calc(-50% + ${offset * pitch}px)) translateZ(${-depth * width * ramp}px) rotateY(${-tilt}deg)`;
+      const edge = (loop && c > 1) ? Math.min(1, Math.max(0, c / 2 - distance)) : 1;
+      card.style.opacity = String(Math.max(0, 1 - fade * distance) * edge);
+      card.style.zIndex = String(100 - Math.round(distance));
+    }
+  }
+
+  function settle(t, triggerPlay = true) {
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    target = t;
+    const newIdx = indexAt(t);
+    selected = newIdx;
+
+    let lastTick = performance.now();
+
+    const step = (tNow) => {
+      const dt = Math.min((tNow - lastTick) * 0.001, 0.05);
+      lastTick = tNow;
+      const remaining = target - pos;
+
+      if (Math.abs(remaining) < 0.0004) {
+        pos = target;
+        paint();
+        rafId = null;
+        if (triggerPlay && count() > 0 && App.currentIndex !== newIdx) {
+          if (onSelect) onSelect(newIdx);
+          else playTrack(newIdx);
+        }
+        return;
+      }
+
+      const factor = 1 - Math.exp(-15 * dt);
+      pos += remaining * factor;
+      paint();
+      rafId = requestAnimationFrame(step);
+    };
+
+    rafId = requestAnimationFrame(step);
+  }
+
+  function goTo(index, triggerPlay = true) {
+    const c = count();
+    if (c === 0) return;
+    const t = (loop && c > 1)
+      ? index + Math.round((target - index) / c) * c
+      : index;
+    settle(clamp(t), triggerPlay);
+  }
+
+  function nudge(by) {
+    settle(clamp(Math.round(target) + by), true);
+  }
+
+  function render() {
+    containerEl = document.getElementById(containerId);
+    frameEl = document.getElementById(frameId);
+    if (!containerEl || !frameEl) return;
+
+    const c = count();
+    if (c === 0) {
+      containerEl.innerHTML = `
+        <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-app-muted">
+          <i class="fa-solid fa-layer-group text-3xl mb-2 text-app-olive"></i>
+          <p class="text-xs font-bold text-app-ink">Vault is empty</p>
+          <p class="text-[11px] text-app-muted">Paste a link to download songs into Coverflow</p>
+        </div>
+      `;
+      cardEls = [];
+      return;
+    }
+
+    containerEl.innerHTML = App.library.map((t, idx) => {
+      const artUrl = `/api/artwork/${encodeURIComponent(t.filename)}`;
+      const isCurrent = idx === App.currentIndex;
+      return `
+        <div data-idx="${idx}" class="${cardClass} absolute left-1/2 top-0 aspect-square overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-2xl border ${isCurrent ? 'border-app-olive olive-glow ring-2 ring-app-olive' : 'border-app-line'} cursor-pointer" style="width: var(--cf-card); will-change: transform, opacity; transform-style: preserve-3d; backface-visibility: hidden;">
+          <img src="${artUrl}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'300\\' height=\\'300\\' viewBox=\\'0 0 300 300\\'><rect width=\\'300\\' height=\\'300\\' fill=\\'%232c331d\\'/><circle cx=\\'150\\' cy=\\'150\\' r=\\'80\\' fill=\\'%236b8e23\\' opacity=\\'0.4\\'/><text x=\\'150\\' y=\\'158\\' fill=\\'%23ffffff\\' font-size=\\'18\\' font-family=\\'Comfortaa, sans-serif\\' text-anchor=\\'middle\\' font-weight=\\'bold\\'>AuraDisc</text></svg>'" alt="${t.title}" class="h-full w-full select-none object-cover pointer-events-none" draggable="false" />
+          <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3.5 sm:p-5 pt-8 text-white flex flex-col justify-end pointer-events-none">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 sm:px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur">${t.format}</span>
+              <span class="text-[10px] sm:text-xs font-mono opacity-80">${t.duration_fmt || ''}</span>
+            </div>
+            <p class="text-xs sm:text-base font-bold truncate leading-tight">${t.title}</p>
+            <p class="text-[11px] sm:text-xs opacity-80 truncate">${t.artist}</p>
+          </div>
+          ${isCurrent && App.isPlaying ? `
+            <div class="absolute top-3 right-3 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-app-olive flex items-center justify-center text-white text-xs sm:text-sm shadow-lg pulse-dot">
+              <i class="fa-solid fa-volume-high text-[10px] sm:text-xs"></i>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    cardEls = Array.from(containerEl.querySelectorAll(`.${cardClass}`));
+
+    cardEls.forEach((card, idx) => {
+      card.onclick = (e) => {
+        e.stopPropagation();
+        goTo(idx, true);
+      };
+    });
+
+    measure();
+    goTo(App.currentIndex || 0, false);
+  }
+
+  function init() {
+    frameEl = document.getElementById(frameId);
+    if (!frameEl) return;
+
+    frameEl.addEventListener('pointerdown', (e) => {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+      frameEl.setPointerCapture(e.pointerId);
+      target = pos;
+      drag = {
+        id: e.pointerId,
+        x: e.clientX,
+        pos: pos,
+        v: 0,
+        t: performance.now()
+      };
+    });
+
+    frameEl.addEventListener('pointermove', (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      if (!width) measure();
+      const pitch = width * (1 + gap);
+      if (!pitch) return;
+      const now = performance.now();
+      const prev = pos;
+      pos = clamp(drag.pos - (e.clientX - drag.x) / pitch);
+      drag.v = ((pos - prev) / Math.max(now - drag.t, 1)) * 1000;
+      drag.t = now;
+      const idx = indexAt(pos);
+      if (idx !== selected) selected = idx;
+
+      if (!dragScheduled) {
+        dragScheduled = true;
+        requestAnimationFrame(() => {
+          dragScheduled = false;
+          paint();
+        });
+      }
+    });
+
+    const endDrag = (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      const v = drag.v;
+      drag = null;
+      const carried = Math.max(-2, Math.min(2, v * 0.18));
+      settle(clamp(Math.round(pos + carried)), true);
+    };
+
+    frameEl.addEventListener('pointerup', endDrag);
+    frameEl.addEventListener('pointercancel', endDrag);
+
+    frameEl.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(1); }
+    });
+
+    window.addEventListener('resize', measure);
+    document.addEventListener('fullscreenchange', () => setTimeout(measure, 100));
+    document.addEventListener('webkitfullscreenchange', () => setTimeout(measure, 100));
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  return {
+    render,
+    goTo,
+    nudge,
+    measure,
+    paint,
+    syncWithPlayer(idx) {
+      goTo(idx, false);
+    }
+  };
+}
+
+const CoverflowEngine = createCoverflowCarousel({
+  frameId: 'cf-frame',
+  containerId: 'cf-cards-container',
+  cardClass: 'cf-card'
+});
+window.CoverflowEngine = CoverflowEngine;
+
+const FsCoverflowEngine = createCoverflowCarousel({
+  frameId: 'fs-cf-frame',
+  containerId: 'fs-cf-cards-container',
+  cardClass: 'fs-cf-card'
+});
+window.FsCoverflowEngine = FsCoverflowEngine;
+
+// ============================================================================
+// WEBGL1 MESH DRIFT SHADER BACKGROUND ENGINE (Optimized 60-120 FPS Blobs)
+// ============================================================================
+const MeshDriftEngine = (() => {
+  let gl = null;
+  let canvas = null;
+  let program = null;
+  let positionBuffer = null;
+  let rafId = null;
+  let startTime = performance.now();
+  let lastTime = 0;
+  let uniforms = {};
+
+  const vsSource = `
+    attribute vec2 position;
+    void main() {
+      gl_Position = vec4(position, 0.0, 1.0);
+    }
+  `;
+
+  const fsSource = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+
+uniform vec3 u_colors[8];
+uniform vec4 u_scene;
+uniform vec4 u_shape;
+uniform vec4 u_surface;
+uniform vec4 u_finish;
+uniform vec4 u_transform;
+uniform vec4 u_space;
+uniform vec4 u_cursor;
+
+#define u_resolution u_scene.xy
+#define u_time u_scene.z
+#define u_colorCount u_scene.w
+#define u_scale u_shape.x
+#define u_intensity u_shape.y
+#define u_paramA u_shape.z
+#define u_warp u_shape.w
+#define u_detail u_surface.x
+#define u_contrast u_surface.y
+#define u_brightness u_surface.z
+#define u_saturation u_surface.w
+#define u_hue u_finish.x
+#define u_vignette u_finish.y
+#define u_blur u_finish.z
+#define u_grain u_finish.w
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+#define u_seed u_transform.x
+#else
+#define u_seed mod(u_transform.x, 31.0)
+#endif
+#define u_rotate u_transform.y
+#define u_drift u_transform.z
+#define u_oklab u_transform.w
+#define u_offset u_space.xy
+#define u_mouse u_space.zw
+#define u_cursorPresence u_cursor.x
+#define u_cursorEffect u_cursor.y
+#define u_cursorStrength u_cursor.z
+#define u_cursorRadius u_cursor.w
+
+float hash21(vec2 p) {
+#ifndef GL_FRAGMENT_PRECISION_HIGH
+  p = mod(p, 31.0);
+#endif
+  p = fract(p * vec2(234.34, 435.345));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
+}
+
+float grainHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+vec2 hash22(vec2 p) {
+#ifndef GL_FRAGMENT_PRECISION_HIGH
+  p = mod(p, 31.0);
+#endif
+  float n = sin(dot(p, vec2(41.0, 289.0)));
+  return fract(vec2(15731.743, 7892.321) * n);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
+    mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x),
+    u.y);
+}
+
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 5; i++) {
+    v += a * noise(p);
+    p = p * 2.03 + vec2(17.0, 9.2);
+    a *= 0.5;
+  }
+  return v;
+}
+
+vec3 srgbToLinear(vec3 c) {
+  return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)),
+    step(0.04045, c));
+}
+vec3 linearToSrgb(vec3 c) {
+  return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055,
+    step(0.0031308, c));
+}
+vec3 linToOklab(vec3 c) {
+  float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
+  float m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
+  float s = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
+  l = pow(max(l, 0.0), 1.0 / 3.0);
+  m = pow(max(m, 0.0), 1.0 / 3.0);
+  s = pow(max(s, 0.0), 1.0 / 3.0);
+  return vec3(
+    0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s);
+}
+vec3 oklabToLin(vec3 c) {
+  float l = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z;
+  float m = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z;
+  float s = c.x - 0.0894841775 * c.y - 1.2914855480 * c.z;
+  l = l * l * l; m = m * m * m; s = s * s * s;
+  return vec3(
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
+}
+vec3 mixColour(vec3 a, vec3 b, float t) {
+  if (u_oklab > 0.5) {
+    vec3 la = linToOklab(srgbToLinear(a));
+    vec3 lb = linToOklab(srgbToLinear(b));
+    return clamp(linearToSrgb(oklabToLin(mix(la, lb, t))), 0.0, 1.0);
+  }
+  return mix(a, b, t);
+}
+
+vec3 palette(float x) {
+  float n = max(u_colorCount - 1.0, 1.0);
+  float f = clamp(x, 0.0, 1.0) * n;
+  vec3 col = u_colors[0];
+  for (int i = 0; i < 7; i++) {
+    if (float(i) < n)
+      col = mixColour(col, u_colors[i + 1],
+        smoothstep(0.0, 1.0, clamp(f - float(i), 0.0, 1.0)));
+  }
+  return col;
+}
+
+vec3 hueRotate(vec3 col, float a) {
+  const mat3 toYIQ = mat3(0.299, 0.596, 0.211,
+                          0.587, -0.274, -0.523,
+                          0.114, -0.322, 0.312);
+  const mat3 toRGB = mat3(1.0, 1.0, 1.0,
+                          0.956, -0.272, -1.106,
+                          0.621, -0.647, 1.703);
+  vec3 yiq = toYIQ * col;
+  float ca = cos(a), sa = sin(a);
+  yiq = vec3(yiq.x, yiq.y * ca - yiq.z * sa, yiq.y * sa + yiq.z * ca);
+  return toRGB * yiq;
+}
+
+vec3 shade(vec2 uv, vec2 p, float t) {
+  vec3 acc = u_colors[0] * 0.15;
+  float total = 0.15;
+  for (int i = 0; i < 8; i++) {
+    if (float(i) >= u_colorCount) break;
+    float fi = float(i);
+    vec2 c = vec2(
+      sin(t * (0.21 + fi * 0.071) + fi * 2.4 + u_seed),
+      cos(t * (0.17 + fi * 0.093) + fi * 1.7)) * (0.45 + u_intensity * 0.35);
+    float w = exp(-dot(p - c, p - c) * 6.0);
+    acc += u_colors[i] * w;
+    total += w;
+  }
+  return acc / total;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+  vec2 screenUv = uv;
+  vec2 p = (gl_FragCoord.xy - 0.5 * u_resolution.xy)
+    / min(u_resolution.x, u_resolution.y);
+  float cursorMask = 0.0;
+
+  if (u_cursorPresence > 0.001) {
+    vec2 cursor = (0.5 * u_mouse * u_resolution.xy)
+      / min(u_resolution.x, u_resolution.y);
+    vec2 cursorDelta = p - cursor;
+    if (u_cursorEffect < 0.5) {
+      p += cursor * u_cursorPresence * u_cursorStrength * 0.55;
+    } else {
+      float cursorDistance = length(cursorDelta);
+      vec2 cursorDirection = cursorDelta / max(cursorDistance, 0.0001);
+      cursorMask = u_cursorPresence
+        * (1.0 - smoothstep(0.0, u_cursorRadius, cursorDistance));
+      if (u_cursorEffect < 1.5) {
+        p -= cursorDirection * cursorMask * u_cursorStrength * 0.24;
+      } else if (u_cursorEffect < 2.5) {
+        float cursorAngle = cursorMask * u_cursorStrength * 2.2;
+        float cc = cos(cursorAngle), cs = sin(cursorAngle);
+        p = cursor + mat2(cc, -cs, cs, cc) * cursorDelta;
+      } else if (u_cursorEffect < 3.5) {
+        float ripple = sin(
+          cursorDistance / max(u_cursorRadius, 0.001) * 18.0 - u_time * 5.0);
+        p -= cursorDirection * ripple * cursorMask * u_cursorStrength * 0.07;
+      }
+    }
+  }
+
+  uv = p * min(u_resolution.x, u_resolution.y) / u_resolution.xy + 0.5;
+  p *= u_scale;
+  if (abs(u_rotate) > 0.0001) {
+    float cr = cos(u_rotate), sr = sin(u_rotate);
+    p = mat2(cr, -sr, sr, cr) * p;
+  }
+  p += u_offset;
+  if (u_drift > 0.0001)
+    p += u_drift * vec2(sin(u_time * 0.31), cos(u_time * 0.23));
+  if (u_warp > 0.0) {
+    p += u_warp * (vec2(
+      fbm(p * u_detail + u_seed),
+      fbm(p * u_detail + vec2(5.2, 1.3))) - 0.5);
+  }
+  vec3 col;
+  if (u_blur > 0.0) {
+    float e = u_blur;
+    float pe = e * u_scale;
+    vec2 uvE = vec2(e) * min(u_resolution.x, u_resolution.y) / u_resolution.xy;
+    col  = shade(uv, p, u_time) * 0.36;
+    col += shade(uv + vec2(uvE.x, 0.0), p + vec2(pe, 0.0), u_time) * 0.16;
+    col += shade(uv - vec2(uvE.x, 0.0), p - vec2(pe, 0.0), u_time) * 0.16;
+    col += shade(uv + vec2(0.0, uvE.y), p + vec2(0.0, pe), u_time) * 0.16;
+    col += shade(uv - vec2(0.0, uvE.y), p - vec2(0.0, pe), u_time) * 0.16;
+  } else {
+    col = shade(uv, p, u_time);
+  }
+  if (abs(u_contrast - 1.0) > 0.0001)
+    col = (col - 0.5) * u_contrast + 0.5;
+  if (abs(u_saturation - 1.0) > 0.0001) {
+    float luma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(luma), col, u_saturation);
+  }
+  if (abs(u_hue) > 0.0001)
+    col = hueRotate(col, u_hue);
+  if (abs(u_brightness) > 0.0001)
+    col += u_brightness;
+  if (u_vignette > 0.0001) {
+    float vd = length(screenUv - 0.5) * 1.41421356;
+    col *= 1.0 - u_vignette * smoothstep(0.35, 1.0, vd);
+  }
+  if (u_cursorPresence > 0.001 && u_cursorEffect > 3.5)
+    col += (vec3(0.18) + col * 0.12) * cursorMask * u_cursorStrength;
+  if (u_grain > 0.0001)
+    col += (grainHash(
+      gl_FragCoord.xy + vec2(u_seed * 17.0, u_seed * 31.0)) - 0.5) * u_grain;
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}
+  `;
+
+  function createShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error('Shader compile error:', gl.getShaderInfoLog(s));
+      gl.deleteShader(s);
+      return null;
+    }
+    return s;
+  }
+
+  function init() {
+    canvas = document.getElementById('bg-mesh-drift');
+    if (!canvas) return;
+    try {
+      gl = canvas.getContext('webgl', { alpha: false, antialias: false, powerPreference: 'low-power' }) ||
+           canvas.getContext('experimental-webgl');
+    } catch (e) { return; }
+    if (!gl) return;
+
+    const vs = createShader(gl.VERTEX_SHADER, vsSource);
+    const fs = createShader(gl.FRAGMENT_SHADER, fsSource);
+    if (!vs || !fs) return;
+
+    program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(program));
+      return;
+    }
+
+    gl.useProgram(program);
+
+    positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+    const posLoc = gl.getAttribLocation(program, 'position');
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    uniforms = {
+      u_colors: gl.getUniformLocation(program, 'u_colors'),
+      u_scene: gl.getUniformLocation(program, 'u_scene'),
+      u_shape: gl.getUniformLocation(program, 'u_shape'),
+      u_surface: gl.getUniformLocation(program, 'u_surface'),
+      u_finish: gl.getUniformLocation(program, 'u_finish'),
+      u_transform: gl.getUniformLocation(program, 'u_transform'),
+      u_space: gl.getUniformLocation(program, 'u_space'),
+      u_cursor: gl.getUniformLocation(program, 'u_cursor')
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+      } else {
+        if (!rafId) {
+          lastTime = performance.now();
+          rafId = requestAnimationFrame(loop);
+        }
+      }
+    });
+
+    lastTime = performance.now();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function resize() {
+    if (!canvas || !gl) return;
+    // Super-smooth balanced resolution for 60-120fps with zero visual loss
+    const dpr = Math.min(window.devicePixelRatio || 1, 0.75);
+    const w = Math.max(320, Math.round(window.innerWidth * dpr));
+    const h = Math.max(240, Math.round(window.innerHeight * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+      gl.viewport(0, 0, w, h);
+    }
+  }
+
+  function loop(now) {
+    if (!gl || !program) return;
+    rafId = requestAnimationFrame(loop);
+
+    if (!lastTime) lastTime = now;
+    const timeSec = (now - startTime) * 0.001;
+
+    gl.useProgram(program);
+
+    // 8 colors: #101010, #F5F5F5, #B0B0B0, #3A3A3A
+    const colorData = new Float32Array([
+      0.063, 0.063, 0.063,
+      0.961, 0.961, 0.961,
+      0.690, 0.690, 0.690,
+      0.227, 0.227, 0.227,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0
+    ]);
+    gl.uniform3fv(uniforms.u_colors, colorData);
+
+    gl.uniform4f(uniforms.u_scene, canvas.width, canvas.height, timeSec * 0.73, 4.0);
+    gl.uniform4f(uniforms.u_shape, 1.16, 0.34, 0.50, 0.00);
+    gl.uniform4f(uniforms.u_surface, 2.40, 1.16, 0.00, 1.00);
+    gl.uniform4f(uniforms.u_finish, 0.00, 0.00, 0.000, 0.09);
+    gl.uniform4f(uniforms.u_transform, 1453.0, 0.00, 0.00, 0.0);
+    gl.uniform4f(uniforms.u_space, 0.00, 0.00, 0.0, 0.0);
+    gl.uniform4f(uniforms.u_cursor, 0.0, 2.0, 0.65, 0.46);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  return { init };
+})();
+window.MeshDriftEngine = MeshDriftEngine;
 </script>
 </body>
 </html>

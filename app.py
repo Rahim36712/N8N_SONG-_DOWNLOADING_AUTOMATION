@@ -27,7 +27,7 @@ JOB_EVENT_CAP = 500              # max buffered SSE events per job
 JOB_TTL = 2 * 60 * 60            # finished jobs pruned after 2h
 
 
-def _new_job(query, audio_format, audio_quality):
+def _new_job(query, audio_format, audio_quality, title=None, artist=None):
     job_id = uuid.uuid4().hex[:12]
     with JOBS_LOCK:
         now = time.time()
@@ -36,6 +36,7 @@ def _new_job(query, audio_format, audio_quality):
             del JOBS[jid]
         JOBS[job_id] = {
             "id": job_id, "query": query, "format": audio_format,
+            "title": title or query, "artist": artist or "",
             "status": "queued", "stage": "", "progress": 0,
             "result": None, "events": [],
             "created_at": now, "finished_at": 0.0, "cancel": False,
@@ -99,21 +100,27 @@ def _run_download_job(job_id, query, audio_format, audio_quality):
 
         if out.get("status") == "error":
             _update_job(job_id, status="error", stage="failed", result=out, progress=100)
+            _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "error", "result_status": "error"})
         else:
-            _update_job(job_id, status="done", stage="complete", result=out, progress=100)
-        _append_event(job_id, {"t": time.time(), "status": "job_end", "result_status": out.get("status")})
+            _update_job(job_id, status="done", stage="complete", result=out, progress=100,
+                        title=out.get("title") or query, artist=out.get("uploader") or "")
+            _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "done", "result_status": out.get("status")})
     except DownloadCancelled:
         _update_job(job_id, status="cancelled", stage="cancelled")
-        _append_event(job_id, {"t": time.time(), "status": "cancelled"})
+        _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "cancelled", "result_status": "cancelled"})
     except Exception as e:
         _update_job(job_id, status="error", stage="failed",
                     result={"status": "error", "query": query, "error": str(e),
                             "trace": traceback.format_exc()})
-        _append_event(job_id, {"t": time.time(), "status": "job_end", "result_status": "error"})
+        _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "error", "result_status": "error"})
 
 @app.after_request
 def add_header(response):
-    if request.endpoint == 'api_stream' or (request.path and request.path.startswith('/api/stream/')):
+    if request.endpoint == 'api_artwork' or (request.path and request.path.startswith('/api/artwork/')):
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+        response.headers.pop('Pragma', None)
+        response.headers.pop('Expires', None)
+    elif request.endpoint == 'api_stream' or (request.path and request.path.startswith('/api/stream/')):
         response.headers['Cache-Control'] = 'public, max-age=3600'
         response.headers.pop('Pragma', None)
         response.headers.pop('Expires', None)
@@ -126,6 +133,67 @@ def add_header(response):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/api/track/preview", methods=["POST"])
+def api_track_preview():
+    data = request.get_json() or {}
+    query = data.get("query") or data.get("url")
+    if not query:
+        return jsonify({"status": "error", "error": "No query provided"}), 400
+    res = download_song.get_track_preview(query)
+    code = 200 if res.get("status") == "success" else 400
+    return jsonify(res), code
+
+@app.route("/api/playlist/preview", methods=["POST"])
+def api_playlist_preview():
+    data = request.get_json() or {}
+    url = data.get("url")
+    if not url:
+        return jsonify({"status": "error", "error": "No URL provided"}), 400
+    res = download_song.get_playlist_preview(url)
+    code = 200 if res.get("status") == "success" else 400
+    return jsonify(res), code
+
+@app.route("/api/playlist/download", methods=["POST"])
+def api_playlist_download():
+    data = request.get_json() or {}
+    tracks = data.get("tracks") or []
+    default_format = data.get("format", "bluray")
+    default_quality = data.get("quality", "0")
+
+    if not tracks or not isinstance(tracks, list):
+        return jsonify({"status": "error", "error": "No tracks provided"}), 400
+
+    dirs = download_song.get_dirs()
+    os.makedirs(dirs["music"], exist_ok=True)
+
+    jobs = []
+    for item in tracks:
+        if isinstance(item, str):
+            q_str = item.strip()
+            fmt = default_format
+            title = q_str
+            artist = ""
+        else:
+            q_str = (item.get("query") or f"{item.get('artist', '')} {item.get('title', '')}".strip() or item.get("title") or "").strip()
+            fmt = item.get("format") or default_format
+            title = item.get("title") or q_str
+            artist = item.get("artist") or ""
+
+        if not q_str:
+            continue
+
+        job_id = _new_job(q_str, fmt, default_quality, title=title, artist=artist)
+        JOB_POOL.submit(_run_download_job, job_id, q_str, fmt, default_quality)
+        jobs.append({
+            "job_id": job_id,
+            "query": q_str,
+            "title": title,
+            "artist": artist,
+            "format": fmt
+        })
+
+    return jsonify({"status": "queued", "count": len(jobs), "jobs": jobs}), 202
 
 @app.route("/api/download", methods=["POST"])
 def api_download():
@@ -145,7 +213,9 @@ def api_download():
 
     # B1: async mode returns a job_id immediately; default stays synchronous (n8n compatible)
     if data.get("mode") == "async":
-        job_id = _new_job(query, audio_format, audio_quality)
+        title = data.get("title") or query
+        artist = data.get("artist") or ""
+        job_id = _new_job(query, audio_format, audio_quality, title=title, artist=artist)
         JOB_POOL.submit(_run_download_job, job_id, query, audio_format, audio_quality)
         return jsonify({"status": "queued", "job_id": job_id}), 202
 
@@ -171,7 +241,7 @@ def api_jobs():
     with JOBS_LOCK:
         jobs = sorted(JOBS.values(), key=lambda j: j["created_at"], reverse=True)
         return jsonify({"status": "success", "jobs": [
-            {k: j[k] for k in ("id", "query", "status", "stage", "progress",
+            {k: j.get(k) for k in ("id", "query", "title", "artist", "status", "stage", "progress",
                                "format", "created_at")} for j in jobs
         ]})
 
@@ -183,7 +253,7 @@ def api_job_status(job_id):
         return jsonify({"status": "error", "error": "Job not found"}), 404
     with JOBS_LOCK:
         return jsonify({"status": "success", "job": {
-            k: job[k] for k in ("id", "query", "status", "stage", "progress",
+            k: job.get(k) for k in ("id", "query", "title", "artist", "status", "stage", "progress",
                                 "result", "format", "created_at")
         }})
 
@@ -297,6 +367,143 @@ def api_stream(filename):
     dirs = download_song.get_dirs()
     music_dir = dirs["music"]
     return send_from_directory(music_dir, filename)
+
+def _extract_embedded_artwork(filepath):
+    """Pull the highest-resolution cover embedded in the audio tags (best-effort)."""
+    try:
+        from mutagen import File as MutagenFile
+    except Exception:
+        return None
+    try:
+        f = MutagenFile(filepath)
+    except Exception:
+        return None
+    if f is None:
+        return None
+    pics = getattr(f, "pictures", None)  # FLAC
+    if pics:
+        try:
+            return max(pics, key=lambda p: len(p.data)).data or None
+        except Exception:
+            return None
+    tags = getattr(f, "tags", None)
+    if not tags:
+        return None
+    try:
+        covr = tags.get("covr")  # MP4/M4A
+        if covr:
+            return bytes(covr[0]) or None
+    except Exception:
+        pass
+    try:
+        apics = tags.getall("APIC")  # MP3/ID3
+        if apics:
+            return max(apics, key=lambda p: len(p.data)).data or None
+    except Exception:
+        pass
+    try:
+        blk = tags.get("metadata_block_picture")  # OGG Vorbis
+        if blk:
+            import base64
+            from mutagen.flac import Picture
+            return Picture(base64.b64decode(blk[0])).data or None
+    except Exception:
+        pass
+    return None
+
+
+def _fetch_hd_artwork(title, artist):
+    """Hi-res cover from the iTunes Search API (1200x1200 upgrade of artworkUrl100)."""
+    info = download_song.lookup_itunes(artist or "", title or "")
+    if not info or not info.get("cover_url"):
+        return None
+    url = str(info["cover_url"]).replace("600x600", "1200x1200")
+    try:
+        import requests
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200 and r.content:
+            return r.content
+    except Exception:
+        pass
+    return None
+
+
+_ART_LRU_MAX = 32
+_ART_CACHE = {}          # stem -> bytes (in-memory LRU, avoids disk hits on repeat polls)
+_ART_ORDER = []
+
+
+def _art_lru_get(stem):
+    data = _ART_CACHE.get(stem)
+    if data is not None:
+        try:
+            _ART_ORDER.remove(stem)
+            _ART_ORDER.append(stem)
+        except ValueError:
+            pass
+    return data
+
+
+def _art_lru_put(stem, data):
+    _ART_CACHE[stem] = data
+    if stem in _ART_ORDER:
+        _ART_ORDER.remove(stem)
+    _ART_ORDER.append(stem)
+    while len(_ART_ORDER) > _ART_LRU_MAX:
+        old = _ART_ORDER.pop(0)
+        _ART_CACHE.pop(old, None)
+
+
+def _serve_artwork(data):
+    resp = Response(data, mimetype="image/jpeg")
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
+
+
+@app.route("/api/artwork/<path:filename>", methods=["GET"])
+def api_artwork(filename):
+    """HD cover art for the Now Playing view, served at its native aspect ratio:
+    embedded tag art as-is (square covers stay square, 16:9 video thumbs stay wide);
+    iTunes 1200x1200 only fills in when the track has no embedded art. Cached on
+    disk at <music>/.artwork/<stem>.jpg and in a small in-memory LRU."""
+    dirs = download_song.get_dirs()
+    safe_filename = os.path.basename(filename)
+    filepath = os.path.join(dirs["music"], safe_filename)
+    if not os.path.isfile(filepath):
+        return jsonify({"status": "error", "error": "Track not found"}), 404
+
+    stem = download_song._safe_stem(safe_filename)
+    cached = _art_lru_get(stem)
+    if cached:
+        return _serve_artwork(cached)
+
+    cache_dir = os.path.join(dirs["music"], ".artwork")
+    cache_path = os.path.join(cache_dir, f"{stem}.jpg")
+    try:
+        if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 0:
+            with open(cache_path, "rb") as fh:
+                data = fh.read()
+            if data:
+                _art_lru_put(stem, data)
+                return _serve_artwork(data)
+    except Exception:
+        pass
+
+    artist, title = download_song.extract_artist_and_title(safe_filename)
+    data = _extract_embedded_artwork(filepath)
+    if not data:
+        data = _fetch_hd_artwork(title, artist)
+    if not data:
+        return jsonify({"status": "error", "error": "No artwork available"}), 404
+
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(cache_path, "wb") as fh:
+            fh.write(data)
+    except Exception:
+        pass
+    _art_lru_put(stem, data)
+    return _serve_artwork(data)
 
 @app.route("/api/delete", methods=["POST"])
 def api_delete():

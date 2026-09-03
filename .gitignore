@@ -62,6 +62,7 @@ AutoDownloads/
 
 # Local machine config (see config.example.json)
 config.json
+.cache
 
 # Local design mockup (reference only, never ship)
 /01-AuraDisc Pro - Player.html
