@@ -56,6 +56,7 @@ Thumbs.db
 # Project-specific logs or local downloads
 *.csv
 *.txt
+!requirements.txt
 *.spotdl
 Downloads/
 AutoDownloads/

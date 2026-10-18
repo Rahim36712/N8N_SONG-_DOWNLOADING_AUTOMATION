@@ -7,10 +7,11 @@
   "lyrics_dir": null,
   "db_file": null,
 
-  "max_workers": 4,
+  "max_workers": 2,
   "default_format": "mp3",
   "default_quality": "0",
   "search_candidates": 8,
+  "max_playlist_tracks": 200,
 
   "auto_tag": true,
   "auto_lyrics": true,

@@ -7,16 +7,64 @@ import threading
 import subprocess
 import traceback
 import concurrent.futures
+import gc
 from datetime import datetime
+from urllib.parse import urlsplit
+from werkzeug.exceptions import HTTPException
 import download_song
 from yt_dlp.utils import DownloadCancelled
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
+
+
+@app.before_request
+def validate_local_request():
+    # Keep CLI/n8n callers (no Origin) compatible; browser API calls must be same-origin.
+    if urlsplit(request.host_url).hostname not in ('127.0.0.1', 'localhost', '::1'):
+        return jsonify(status='error', error='Untrusted host'), 400
+    origin = request.headers.get('Origin')
+    if origin and origin.rstrip('/') != request.host_url.rstrip('/'):
+        return jsonify(status='error', error='Cross-origin requests are not allowed'), 403
+    # Opening the player from another tab/site can be a cross-site navigation.
+    # Only its read-only top-level document is exempt, never API calls or frames.
+    player_navigation = (
+        request.endpoint == 'index'
+        and request.method in ('GET', 'HEAD')
+        and request.headers.get('Sec-Fetch-Mode') == 'navigate'
+        and request.headers.get('Sec-Fetch-Dest') == 'document'
+    )
+    if request.headers.get('Sec-Fetch-Site') == 'cross-site' and not player_navigation:
+        return jsonify(status='error', error='Cross-site requests are not allowed'), 403
+    if request.method in ('POST', 'PUT', 'PATCH') and request.content_length:
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify(status='error', error='JSON body must be an object'), 400
+        for key in ('query', 'url', 'playlist_url', 'filename', 'name', 'title', 'artist', 'format', 'quality', 'mode', 'lyrics'):
+            if key in data and not isinstance(data[key], str):
+                return jsonify(status='error', error=f'{key} must be a string'), 400
+        for key in ('query', 'url', 'playlist_url'):
+            if key in data and (len(data[key]) > 2000 or not download_song.valid_query(data[key])):
+                return jsonify(status='error', error=f'Invalid {key}: use a song name or YouTube/Spotify URL'), 400
+        if 'format' in data and data['format'].lower() not in download_song.AUDIO_FORMATS:
+            return jsonify(status='error', error='Unsupported audio format'), 400
+        if 'quality' in data and data['quality'] not in tuple(str(i) for i in range(11)) + ('128', '192', '256', '320'):
+            return jsonify(status='error', error='Invalid audio quality'), 400
+        for key in ('purge_all', 'translate'):
+            if key in data and not isinstance(data[key], bool):
+                return jsonify(status='error', error=f'{key} must be a boolean'), 400
+
+
+@app.errorhandler(HTTPException)
+def api_http_error(error):
+    if request.path.startswith('/api/'):
+        return jsonify(status='error', error=error.description), error.code
+    return error
 
 # Shared worker pools (C6: sizes from config.json)
-_WORKERS = int(download_song.load_config().get("max_workers") or 4)
+_WORKERS = download_song.worker_count()
 BATCH_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=_WORKERS)
 
 # B1: async job queue
@@ -25,6 +73,7 @@ JOBS = {}                        # job_id -> job dict
 JOBS_LOCK = threading.RLock()
 JOB_EVENT_CAP = 500              # max buffered SSE events per job
 JOB_TTL = 2 * 60 * 60            # finished jobs pruned after 2h
+JOB_LIMIT = 200
 
 
 def _new_job(query, audio_format, audio_quality, title=None, artist=None):
@@ -34,11 +83,14 @@ def _new_job(query, audio_format, audio_quality, title=None, artist=None):
         for jid in [jid for jid, j in JOBS.items()
                     if j["status"] in ("done", "error", "cancelled") and now - j["finished_at"] > JOB_TTL]:
             del JOBS[jid]
+        if sum(j['status'] in ('queued', 'running') for j in JOBS.values()) >= JOB_LIMIT:
+            from werkzeug.exceptions import TooManyRequests
+            raise TooManyRequests('Download queue is full; retry when jobs finish')
         JOBS[job_id] = {
             "id": job_id, "query": query, "format": audio_format,
             "title": title or query, "artist": artist or "",
             "status": "queued", "stage": "", "progress": 0,
-            "result": None, "events": [],
+            "result": None, "events": [], "event_seq": 0, "future": None,
             "created_at": now, "finished_at": 0.0, "cancel": False,
         }
     return job_id
@@ -66,19 +118,34 @@ def _append_event(job_id, event):
         if job is None:
             return
         events = job["events"]
-        events.append(event)
+        job['event_seq'] += 1
+        events.append({**event, 'seq': job['event_seq']})
         if len(events) > JOB_EVENT_CAP:
             del events[:len(events) - JOB_EVENT_CAP]
 
 
+def _submit_job(job_id, query, audio_format, audio_quality):
+    future = JOB_POOL.submit(_run_download_job, job_id, query, audio_format, audio_quality)
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job:
+            job['future'] = future
+            if job['cancel']:
+                future.cancel()
+
+
 def _run_download_job(job_id, query, audio_format, audio_quality):
-    _update_job(job_id, status="running", stage="starting")
-    dirs = download_song.get_dirs()
-    os.makedirs(dirs["music"], exist_ok=True)
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if not job or job['cancel'] or job['status'] == 'cancelled':
+            return
+        _update_job(job_id, status="running", stage="starting")
 
     def progress_cb(ev):
         ev = dict(ev)
-        if ev.get("status") == "downloading":
+        if ev.get('status') == 'playlist_progress':
+            _update_job(job_id, stage='downloading', progress=ev.get('percent') or 0)
+        elif ev.get("status") == "downloading":
             _update_job(job_id, stage="downloading", progress=ev.get("percent") or 0)
         elif ev.get("status") == "finished":
             _update_job(job_id, stage="processing", progress=95)
@@ -89,33 +156,50 @@ def _run_download_job(job_id, query, audio_format, audio_quality):
         return job is None or job.get("cancel")
 
     try:
+        dirs = download_song.get_dirs()
+        os.makedirs(dirs['music'], exist_ok=True)
         if download_song.is_yt_playlist(query):
-            out = download_song.handle_yt_playlist(query, dirs["music"], dirs, audio_format, audio_quality)
+            out = download_song.handle_yt_playlist(query, dirs["music"], dirs, audio_format, audio_quality,
+                                                    progress_cb=progress_cb, cancel_check=cancel_check)
         elif download_song.is_spotify(query):
-            out = download_song.handle_spotify(query, dirs["music"], dirs, audio_format, audio_quality)
+            out = download_song.handle_spotify(query, dirs["music"], dirs, audio_format, audio_quality,
+                                                progress_cb=progress_cb, cancel_check=cancel_check)
         else:
             out = download_song.download_single(query, dirs["music"], dirs, audio_format, audio_quality,
                                                 progress_cb=progress_cb, cancel_check=cancel_check)
             download_song.log_download(dirs["log"], out)
 
-        if out.get("status") == "error":
+        if out.get('status') == 'playlist_done':
+            failed = sum(r.get('status') == 'error' for r in out.get('results', []))
+            out['failed'] = failed
+            if failed:
+                out['error'] = f'{failed} of {out.get("total", failed)} tracks failed. Retry failed tracks.'
+                out['partial'] = bool(out.get('downloaded') or out.get('skipped'))
+        if cancel_check():
+            raise DownloadCancelled()
+        if out.get("status") == "error" or out.get('failed'):
             _update_job(job_id, status="error", stage="failed", result=out, progress=100)
             _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "error", "result_status": "error"})
         else:
             _update_job(job_id, status="done", stage="complete", result=out, progress=100,
-                        title=out.get("title") or query, artist=out.get("uploader") or "")
+                        title=out.get("title") or job['title'], artist=out.get("uploader") or job['artist'])
             _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "done", "result_status": out.get("status")})
     except DownloadCancelled:
         _update_job(job_id, status="cancelled", stage="cancelled")
         _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "cancelled", "result_status": "cancelled"})
     except Exception as e:
         _update_job(job_id, status="error", stage="failed",
-                    result={"status": "error", "query": query, "error": str(e),
-                            "trace": traceback.format_exc()})
+                    result={"status": "error", "query": query, "error": str(e)})
+        app.logger.exception('Download job failed')
         _append_event(job_id, {"t": time.time(), "status": "job_end", "job_status": "error", "result_status": "error"})
+    finally:
+        gc.collect()
 
 @app.after_request
 def add_header(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'same-origin'
     if request.endpoint == 'api_artwork' or (request.path and request.path.startswith('/api/artwork/')):
         response.headers['Cache-Control'] = 'public, max-age=86400'
         response.headers.pop('Pragma', None)
@@ -163,37 +247,44 @@ def api_playlist_download():
 
     if not tracks or not isinstance(tracks, list):
         return jsonify({"status": "error", "error": "No tracks provided"}), 400
+    if len(tracks) > JOB_LIMIT:
+        return jsonify(status='error', error=f'Maximum {JOB_LIMIT} tracks per request'), 400
+    for item in tracks:
+        if isinstance(item, str):
+            query = item
+        elif isinstance(item, dict):
+            if any(not isinstance(item[k], str) for k in ('query', 'title', 'artist', 'format') if k in item):
+                return jsonify(status='error', error='Track fields must be strings'), 400
+            query = item.get('query') or f"{item.get('artist', '')} {item.get('title', '')}".strip()
+            if item.get('format') and item['format'].lower() not in download_song.AUDIO_FORMATS:
+                return jsonify(status='error', error='Unsupported track format'), 400
+        else:
+            return jsonify(status='error', error='Tracks must be strings or objects'), 400
+        if not download_song.valid_query(query) or len(query) > 2000:
+            return jsonify(status='error', error='Invalid track query'), 400
 
     dirs = download_song.get_dirs()
     os.makedirs(dirs["music"], exist_ok=True)
 
     jobs = []
-    for item in tracks:
-        if isinstance(item, str):
-            q_str = item.strip()
-            fmt = default_format
-            title = q_str
-            artist = ""
-        else:
-            q_str = (item.get("query") or f"{item.get('artist', '')} {item.get('title', '')}".strip() or item.get("title") or "").strip()
-            fmt = item.get("format") or default_format
-            title = item.get("title") or q_str
-            artist = item.get("artist") or ""
+    # Reserve the whole request under the same lock: never return 429 after
+    # silently starting only part of a playlist.
+    with JOBS_LOCK:
+        if sum(j['status'] in ('queued', 'running') for j in JOBS.values()) + len(tracks) > JOB_LIMIT:
+            return jsonify(status='error', error='Download queue is full; retry when jobs finish'), 429
+        for item in tracks:
+            if isinstance(item, str):
+                q_str, fmt, title, artist = item.strip(), default_format, item.strip(), ''
+            else:
+                q_str = (item.get('query') or f"{item.get('artist', '')} {item.get('title', '')}".strip()).strip()
+                fmt = item.get('format') or default_format
+                title, artist = item.get('title') or q_str, item.get('artist') or ''
+            job_id = _new_job(q_str, fmt, default_quality, title=title, artist=artist)
+            jobs.append({'job_id': job_id, 'query': q_str, 'title': title, 'artist': artist, 'format': fmt})
+    for job in jobs:
+        _submit_job(job['job_id'], job['query'], job['format'], default_quality)
 
-        if not q_str:
-            continue
-
-        job_id = _new_job(q_str, fmt, default_quality, title=title, artist=artist)
-        JOB_POOL.submit(_run_download_job, job_id, q_str, fmt, default_quality)
-        jobs.append({
-            "job_id": job_id,
-            "query": q_str,
-            "title": title,
-            "artist": artist,
-            "format": fmt
-        })
-
-    return jsonify({"status": "queued", "count": len(jobs), "jobs": jobs}), 202
+    return jsonify({'status': 'queued', 'count': len(jobs), 'jobs': jobs}), 202
 
 @app.route("/api/download", methods=["POST"])
 def api_download():
@@ -216,7 +307,7 @@ def api_download():
         title = data.get("title") or query
         artist = data.get("artist") or ""
         job_id = _new_job(query, audio_format, audio_quality, title=title, artist=artist)
-        JOB_POOL.submit(_run_download_job, job_id, query, audio_format, audio_quality)
+        _submit_job(job_id, query, audio_format, audio_quality)
         return jsonify({"status": "queued", "job_id": job_id}), 202
 
     dirs = download_song.get_dirs()
@@ -234,7 +325,8 @@ def api_download():
 
         return jsonify(out)
     except Exception as e:
-        return jsonify({"status": "error", "error": str(e), "trace": traceback.format_exc()}), 500
+        app.logger.exception('Synchronous download failed')
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route("/api/jobs", methods=["GET"])
 def api_jobs():
@@ -242,7 +334,7 @@ def api_jobs():
         jobs = sorted(JOBS.values(), key=lambda j: j["created_at"], reverse=True)
         return jsonify({"status": "success", "jobs": [
             {k: j.get(k) for k in ("id", "query", "title", "artist", "status", "stage", "progress",
-                               "format", "created_at")} for j in jobs
+                               "format", "result", "created_at")} for j in jobs
         ]})
 
 
@@ -260,34 +352,48 @@ def api_job_status(job_id):
 
 @app.route("/api/jobs/<job_id>/cancel", methods=["POST"])
 def api_job_cancel(job_id):
-    job = _get_job(job_id)
-    if job is None:
-        return jsonify({"status": "error", "error": "Job not found"}), 404
-    if job["status"] == "queued":
-        _update_job(job_id, status="cancelled")
-        return jsonify({"status": "success", "message": "Queued job cancelled"})
-    if job["status"] == "running":
-        _update_job(job_id, cancel=True)
-        return jsonify({"status": "success", "message": "Cancellation requested"})
-    return jsonify({"status": "error", "error": f"Job already {job['status']}"}), 400
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            return jsonify({"status": "error", "error": "Job not found"}), 404
+        if job['status'] == 'queued':
+            _update_job(job_id, status='cancelled', stage='cancelled', cancel=True)
+            if job.get('future'):
+                job['future'].cancel()
+            _append_event(job_id, {'status': 'job_end', 'job_status': 'cancelled'})
+            return jsonify(status='success', message='Queued job cancelled')
+        if job['status'] == 'running':
+            _update_job(job_id, cancel=True)
+            return jsonify(status='success', message='Cancellation requested')
+        return jsonify(status='error', error=f"Job already {job['status']}"), 400
 
 
 @app.route("/api/jobs/<job_id>/events", methods=["GET"])
 def api_job_events(job_id):
     """SSE progress stream: replays buffered events, then streams until terminal state."""
+    if _get_job(job_id) is None:
+        return jsonify(status='error', error='Job not found'), 404
+    try:
+        last_id = max(0, int(request.headers.get('Last-Event-ID', '0')))
+    except ValueError:
+        last_id = 0
     def generate():
-        cursor = 0
+        cursor = last_id
         while True:
-            job = _get_job(job_id)
-            if job is None:
-                yield f"data: {json.dumps({'status': 'error', 'error': 'Job not found'})}\n\n"
+            with JOBS_LOCK:
+                job = JOBS.get(job_id)
+                if not job:
+                    return
+                pending = [dict(ev) for ev in job['events'] if ev['seq'] > cursor]
+                status, progress = job['status'], job['progress']
+                result = job.get('result')
+            for event in pending:
+                cursor = event['seq']
+                yield f"id: {cursor}\ndata: {json.dumps(event)}\n\n"
+            if status in ("done", "error", "cancelled"):
+                yield f"data: {json.dumps({'status': 'job_end', 'job_status': status, 'progress': progress, 'result': result})}\n\n"
                 return
-            while cursor < len(job["events"]):
-                yield f"data: {json.dumps(job['events'][cursor])}\n\n"
-                cursor += 1
-            if job["status"] in ("done", "error", "cancelled"):
-                yield f"data: {json.dumps({'status': 'job_end', 'job_status': job['status'], 'progress': job['progress']})}\n\n"
-                return
+            yield ': heartbeat\n\n'
             time.sleep(0.5)
 
     resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
@@ -305,6 +411,8 @@ def api_batch_download():
 
     if not queries or not isinstance(queries, list):
         return jsonify({"status": "error", "error": "No queries list provided"}), 400
+    if len(queries) > JOB_LIMIT or any(not isinstance(q, str) or not download_song.valid_query(q) or len(q) > 2000 for q in queries):
+        return jsonify(status='error', error='Invalid queries or batch too large'), 400
 
     dirs = download_song.get_dirs()
     out_dir = dirs["music"]
@@ -331,6 +439,7 @@ def api_batch_download():
         idx, res = fut.result()
         results[idx] = res
 
+    gc.collect()
     return jsonify({"status": "batch_done", "results": results})
 
 @app.route("/api/library", methods=["GET"])
@@ -366,6 +475,8 @@ def api_history():
 def api_stream(filename):
     dirs = download_song.get_dirs()
     music_dir = dirs["music"]
+    if os.path.basename(filename) != filename or os.path.splitext(filename)[1].lower() not in download_song.AUDIO_EXTENSIONS:
+        return jsonify(status='error', error='Invalid audio filename'), 400
     return send_from_directory(music_dir, filename)
 
 def _extract_embedded_artwork(filepath):
@@ -479,15 +590,8 @@ def api_artwork(filename):
 
     cache_dir = os.path.join(dirs["music"], ".artwork")
     cache_path = os.path.join(cache_dir, f"{stem}.jpg")
-    try:
-        if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 0:
-            with open(cache_path, "rb") as fh:
-                data = fh.read()
-            if data:
-                _art_lru_put(stem, data)
-                return _serve_artwork(data)
-    except Exception:
-        pass
+    if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 0:
+        return send_from_directory(cache_dir, f"{stem}.jpg", mimetype="image/jpeg")
 
     artist, title = download_song.extract_artist_and_title(safe_filename)
     data = _extract_embedded_artwork(filepath)
@@ -500,9 +604,9 @@ def api_artwork(filename):
         os.makedirs(cache_dir, exist_ok=True)
         with open(cache_path, "wb") as fh:
             fh.write(data)
+        return send_from_directory(cache_dir, f"{stem}.jpg", mimetype="image/jpeg")
     except Exception:
         pass
-    _art_lru_put(stem, data)
     return _serve_artwork(data)
 
 @app.route("/api/delete", methods=["POST"])

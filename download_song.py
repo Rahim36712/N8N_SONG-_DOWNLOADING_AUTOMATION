@@ -22,6 +22,7 @@ import concurrent.futures
 import urllib.request
 import urllib.parse
 import requests
+import functools
 import syncedlyrics
 import yt_dlp
 from bs4 import BeautifulSoup
@@ -30,6 +31,10 @@ from datetime import datetime
 # Robustness knobs (A1/A2)
 SUBPROCESS_TIMEOUT = 300        # hard cap (seconds) for remaining subprocess calls (spotdl, search)
 _LOG_LOCK = threading.Lock()    # serializes CSV log writes across worker threads
+_ARCHIVE_LOCK = threading.RLock()
+AUDIO_EXTENSIONS = {'.mp3', '.flac', '.m4a', '.wav', '.opus', '.aac', '.ogg', '.alac'}
+AUDIO_FORMATS = {'mp3', 'flac', 'm4a', 'wav', 'opus', 'aac', 'vorbis', 'ogg', 'alac', 'bluray', 'blu-ray', 'hires'}
+_SUBPROCESS_KWARGS = {"creationflags": subprocess.BELOW_NORMAL_PRIORITY_CLASS} if (hasattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS") and os.name == "nt") else {}
 
 _CONFIG_CACHE = None
 
@@ -45,7 +50,7 @@ def load_config():
         "log_file": None,           # override: CSV log path
         "lyrics_dir": None,         # override: lyrics sidecar dir
         "db_file": None,            # override: SQLite library index path
-        "max_workers": 4,
+        "max_workers": 2,
         "default_format": "mp3",
         "default_quality": "0",
         "search_candidates": 8,
@@ -55,6 +60,7 @@ def load_config():
         "loudnorm_i": -16,
         "cookies_browser": None,    # e.g. "chrome" — A2 final fallback attempt
         "spotify_watch_url": None,  # C5: playlist polled by the n8n watcher
+        "max_playlist_tracks": 200,
     }
     try:
         cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -66,6 +72,119 @@ def load_config():
         print(f"Config load failed ({e}); using defaults", file=sys.stderr)
     _CONFIG_CACHE = cfg
     return cfg
+
+
+def worker_count():
+    try:
+        return max(1, min(8, int(load_config().get('max_workers') or 2)))
+    except (TypeError, ValueError):
+        return 2
+
+
+def valid_query(query):
+    if not isinstance(query, str) or not query.strip():
+        return False
+    value = query.strip()
+    if any(ord(ch) < 32 for ch in value):
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        if not parsed.scheme and not value.startswith('//'):
+            return True
+        return (parsed.scheme in ('http', 'https') and not parsed.username and not parsed.password
+                and parsed.hostname in ('youtube.com', 'www.youtube.com', 'm.youtube.com',
+                                        'music.youtube.com', 'youtu.be', 'open.spotify.com')
+                and parsed.port in (None, 80, 443))
+    except ValueError:
+        return False
+
+
+_DOWNLOAD_SLOTS = threading.BoundedSemaphore(worker_count())
+
+
+def _check_cancel(cancel_check):
+    if cancel_check and cancel_check():
+        raise yt_dlp.utils.DownloadCancelled()
+
+
+def _run_cancellable_command(cmd, timeout, cancel_check=None):
+    """Bounded subprocess capture; terminate only this worker's process tree."""
+    options = dict(text=True, encoding='utf-8', errors='replace', **_SUBPROCESS_KWARGS)
+    if cancel_check is None:
+        return subprocess.run(cmd, capture_output=True, timeout=timeout, **options)
+    _check_cancel(cancel_check)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options)
+    started = time.monotonic()
+    try:
+        while True:
+            _check_cancel(cancel_check)
+            if time.monotonic() - started >= timeout:
+                raise subprocess.TimeoutExpired(cmd, timeout)
+            try:
+                stdout, stderr = process.communicate(timeout=.25)
+                _check_cancel(cancel_check)
+                return subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
+            except subprocess.TimeoutExpired:
+                pass
+    finally:
+        if process.poll() is None:
+            if os.name == 'nt':
+                try:
+                    subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
+                                   **_SUBPROCESS_KWARGS)
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            if process.poll() is None:
+                process.kill()
+            process.communicate(timeout=5)
+
+
+def _limited_download(func):
+    """One process-wide budget, including synchronous and nested playlist workers."""
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        cancel_check = kwargs.get('cancel_check')
+        while True:
+            _check_cancel(cancel_check)
+            if _DOWNLOAD_SLOTS.acquire(timeout=0.2):
+                break
+        try:
+            _check_cancel(cancel_check)
+            return func(*args, **kwargs)
+        finally:
+            _DOWNLOAD_SLOTS.release()
+    return wrapped
+
+
+def _playlist_limit(items):
+    limit = max(1, min(1000, int(load_config().get('max_playlist_tracks') or 200)))
+    if len(items) > limit:
+        raise ValueError(f'Playlist has {len(items)} tracks; limit is {limit}. Select a smaller batch.')
+
+
+def _playlist_results(items, process, progress_cb=None, cancel_check=None):
+    _playlist_limit(items)
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count()) as executor:
+        futures = [executor.submit(process, item) for item in items]
+        try:
+            for future in concurrent.futures.as_completed(futures):
+                _check_cancel(cancel_check)
+                try:
+                    result = future.result()
+                except yt_dlp.utils.DownloadCancelled:
+                    raise
+                except Exception as e:
+                    result = {'status': 'error', 'error': str(e)}
+                results.append(result)
+                if progress_cb:
+                    progress_cb({'status': 'playlist_progress', 'percent': int(len(results) * 100 / max(1, len(items))),
+                                 'completed': len(results), 'total': len(items)})
+        finally:
+            for future in futures:
+                future.cancel()
+    return results
 
 
 # A2: player-client cycling for anti-403 recovery; optional cookies-from-browser fallback
@@ -650,7 +769,7 @@ def purge_and_reindex_lyrics(dirs=None, purge_all=False):
             print(f"Error reindexing lyrics for {af}: {e}", file=sys.stderr)
             return 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count()) as pool:
         reindexed_count = sum(pool.map(_reindex, audio_files))
 
     return {
@@ -732,8 +851,10 @@ def _archive_contains(dirs, video_id):
 
 def _archive_add(dirs, key):
     try:
-        with open(dirs["archive"], "a", encoding="utf-8") as f:
-            f.write(key + "\n")
+        with _ARCHIVE_LOCK:
+            if not _archive_contains_key(dirs, key):
+                with open(dirs["archive"], "a", encoding="utf-8") as f:
+                    f.write(key + "\n")
     except OSError:
         pass
 
@@ -922,7 +1043,7 @@ def score_candidate(info, expected_duration=None, target_title=None, target_arti
 
 
 def search_best_candidate(query, expected_duration=None, max_candidates=None,
-                          target_title=None, target_artist=None):
+                          target_title=None, target_artist=None, cancel_check=None):
     """A3 smart source selection with Hybrid Option A:
     1. If target_title and target_artist exist, first search YouTube for Topic / Official Audio.
     2. If a matching candidate scores >= 65.0, pick it immediately.
@@ -945,8 +1066,9 @@ def search_best_candidate(query, expected_duration=None, max_candidates=None,
             f"ytsearch{count}:{search_query}",
         ]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=90)
+            r = _run_cancellable_command(cmd, 90, cancel_check)
+        except yt_dlp.utils.DownloadCancelled:
+            raise
         except Exception:
             return []
         if r.returncode != 0 or not r.stdout:
@@ -1005,8 +1127,7 @@ def search_best_candidate(query, expected_duration=None, max_candidates=None,
             best, best_score = c, s
 
     if not best or best_score <= -500.0:
-        best = candidates[0]
-        best_score = 0.0
+        return None
 
     url = best.get("url") or best.get("webpage_url")
     if not url:
@@ -1027,7 +1148,9 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
                     client_set=None, cookies_browser=None, progress_cb=None,
                     cancel_check=None):
     """B2: shared YoutubeDL options builder (replaces CLI flag assembly)."""
-    target_codec = "flac" if str(audio_format).lower() in ("bluray", "blu-ray", "hires") else audio_format
+    target_codec = "flac" if str(audio_format).lower() in ("bluray", "blu-ray", "hires") else str(audio_format).lower()
+    if target_codec == 'ogg':
+        target_codec = 'vorbis'
     if target_codec not in ("mp3", "flac", "m4a", "wav", "opus", "aac", "vorbis", "alac"):
         target_codec = "mp3"
 
@@ -1055,7 +1178,7 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
     if cookies_browser:
         opts["cookiesfrombrowser"] = (cookies_browser,)
 
-    ffmpeg_args = []
+    ffmpeg_args = ["-threads", "2"]
     if str(audio_format).lower() in ("bluray", "blu-ray", "hires"):
         ffmpeg_args.extend(["-sample_fmt", "s32", "-ar", "96000"])
 
@@ -1065,10 +1188,9 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
         i_lufs = cfg.get("loudnorm_i", -16)
         ffmpeg_args.extend(["-af", f"loudnorm=I={i_lufs}:TP=-1.5:LRA=11"])
 
-    if ffmpeg_args:
-        opts["postprocessor_args"] = {
-            "ExtractAudio": ffmpeg_args
-        }
+    opts["postprocessor_args"] = {
+        "ExtractAudio": ffmpeg_args
+    }
 
     if progress_cb or cancel_check:
         def _hook(d):
@@ -1092,6 +1214,32 @@ def _build_ydl_opts(output_dir, dirs, audio_format="mp3", audio_quality="0",
     return opts
 
 
+def ensure_artwork_cached(fpath, dirs, info=None):
+    """Save thumbnail to .artwork/<stem>.jpg directly after download to eliminate
+    expensive runtime audio file parsing via mutagen on the web server."""
+    try:
+        stem = _safe_stem(os.path.basename(fpath))
+        art_dir = os.path.join(dirs["music"], ".artwork")
+        art_path = os.path.join(art_dir, f"{stem}.jpg")
+        if os.path.exists(art_path) and os.path.getsize(art_path) > 0:
+            return art_path
+        os.makedirs(art_dir, exist_ok=True)
+        base_no_ext = os.path.splitext(fpath)[0]
+        import shutil
+        for ext in [".jpg", ".jpeg", ".webp", ".png"]:
+            cand = base_no_ext + ext
+            if os.path.exists(cand) and os.path.getsize(cand) > 0:
+                try:
+                    shutil.copyfile(cand, art_path)
+                    return art_path
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
+
+
+@_limited_download
 def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="0",
                     progress_cb=None, cancel_check=None, expected_duration=None,
                     target_title=None, target_artist=None):
@@ -1102,6 +1250,9 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
     Return dict shape is unchanged from the subprocess era.
     """
     now = datetime.now().isoformat()
+    _check_cancel(cancel_check)
+    if not valid_query(query):
+        return {'status': 'error', 'query': query, 'error': 'Unsupported URL or invalid song query'}
 
     # Resolve target: direct URL vs smart search
     target = query
@@ -1116,11 +1267,11 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
                 expected_duration = expected_duration or enriched.get("duration")
 
         picked = search_best_candidate(query, expected_duration=expected_duration,
-                                       target_title=target_title, target_artist=target_artist)
+                                       target_title=target_title, target_artist=target_artist, cancel_check=cancel_check)
         if picked:
             target = picked["url"]
         else:
-            target = f"ytsearch1:{query}"
+            return {'status': 'error', 'query': query, 'error': 'No confident matching source found. Try artist and song title.', 'engine': 'yt-dlp'}
 
     # Cheap archive pre-check for direct video URLs
     vid = _extract_video_id(target)
@@ -1144,6 +1295,7 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
     for client_set, cookies_browser in attempts:
         retries = 0
         while True:
+            _check_cancel(cancel_check)
             opts = _build_ydl_opts(output_dir, dirs, audio_format, audio_quality,
                                    client_set=client_set, cookies_browser=cookies_browser,
                                    progress_cb=progress_cb, cancel_check=cancel_check)
@@ -1160,6 +1312,9 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
                 fpath = req[0].get("filepath") if req else None
 
                 if not fpath or not os.path.exists(fpath):
+                    if not (vid and _archive_contains(dirs, vid)):
+                        return {'status': 'error', 'query': query,
+                                'error': 'Download finished without an audio file', 'engine': 'yt-dlp'}
                     return {
                         "status": "skipped", "query": query,
                         "title": (info or {}).get("title") or (picked or {}).get("title") or query,
@@ -1170,6 +1325,7 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
                     }
 
                 fname = os.path.basename(fpath)
+                _check_cancel(cancel_check)
                 fsize = os.path.getsize(fpath)
                 if load_config().get("auto_lyrics", True):
                     try:
@@ -1182,6 +1338,10 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
                         auto_tag_file(fpath, title=info.get("title"), artist=info.get("uploader"))
                     except Exception:
                         pass
+                try:
+                    ensure_artwork_cached(fpath, dirs, info=info)
+                except Exception:
+                    pass
                 return {
                     "status": "success", "query": query,
                     "title": info.get("title") or fname,
@@ -1196,6 +1356,9 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
             except Exception as e:
                 last_err = str(e)
                 kind = _classify_error(last_err)
+                if kind == 'fatal':
+                    return {'status': 'error', 'query': query, 'error': last_err[:500],
+                            'timestamp': now, 'engine': 'yt-dlp'}
                 if kind == "transient" and retries < MAX_SAME_CLIENT_RETRIES:
                     retries += 1
                     _sleep_backoff(retries)
@@ -1208,8 +1371,11 @@ def download_single(query, output_dir, dirs, audio_format="mp3", audio_quality="
 
 
 def handle_yt_playlist(playlist_url, output_dir, dirs, audio_format="mp3", audio_quality="0",
-                       progress_cb=None):
+                       progress_cb=None, cancel_check=None):
     """Extract video URLs from a YouTube playlist via the Python API, then download each."""
+    _check_cancel(cancel_check)
+    if not valid_query(playlist_url):
+        return {'status': 'error', 'error': 'Unsupported playlist URL'}
     flat_opts = {
         "quiet": True,
         "no_warnings": True,
@@ -1238,17 +1404,18 @@ def handle_yt_playlist(playlist_url, output_dir, dirs, audio_format="mp3", audio
         return {"status": "error", "query": playlist_url,
                 "error": "No videos found in playlist", "engine": "yt-dlp"}
 
-    results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_url = {executor.submit(download_single, u, output_dir, dirs, audio_format, audio_quality): u for u in urls}
-        for future in concurrent.futures.as_completed(future_to_url):
-            res = future.result()
-            log_download(dirs["log"], res)
-            results.append(res)
+    def process(url):
+        _check_cancel(cancel_check)
+        res = download_single(url, output_dir, dirs, audio_format, audio_quality, cancel_check=cancel_check)
+        log_download(dirs['log'], res)
+        return res
+    results = _playlist_results(urls, process, progress_cb, cancel_check)
 
     ok = sum(1 for x in results if x.get("status") == "success")
     return {"status": "playlist_done", "source": "youtube", "engine": "yt-dlp",
-            "total": len(urls), "downloaded": ok, "results": results}
+            "total": len(urls), "downloaded": ok,
+            "skipped": sum(x.get('status') == 'skipped' for x in results),
+            "failed": sum(x.get('status') == 'error' for x in results), "results": results}
 
 
 # ---------------------------------------------------------------------------
@@ -1598,7 +1765,9 @@ def get_track_preview(query):
                         yt_query = f"{artists} {title}".strip()
                         picked = search_best_candidate(yt_query, expected_duration=dur_sec,
                                                        target_title=title, target_artist=artists)
-                        yt_url = picked["url"] if picked else f"ytsearch1:{yt_query}"
+                        if not picked:
+                            return {'status': 'error', 'error': 'No confident matching source found for this Spotify track'}
+                        yt_url = picked['url']
 
                         # Inspect audio formats via yt-dlp
                         return _inspect_track_formats(yt_url,
@@ -1633,7 +1802,7 @@ def get_track_preview(query):
         if picked:
             target = picked["url"]
         else:
-            target = f"ytsearch1:{raw}"
+            return {'status': 'error', 'error': 'No confident matching source found. Try artist and song title.'}
 
     return _inspect_track_formats(target,
                                   fallback_title=enriched_title or (picked or {}).get("title"),
@@ -1673,20 +1842,17 @@ def _inspect_track_formats(target, fallback_title=None, fallback_artist=None,
 
     # Check stream audio formats
     formats = (info or {}).get("formats") or []
-    audio_formats = [f for f in formats if f.get("acodec") != "none" or f.get("vcodec") == "none"]
+    audio_formats = [f for f in formats if f.get('acodec') not in (None, 'none')]
     abrs = [f.get("abr") for f in audio_formats if f.get("abr")]
     asrs = [f.get("asr") for f in audio_formats if f.get("asr")]
 
-    max_abr = max(abrs) if abrs else 128.0
-    max_asr = max(asrs) if asrs else 44100
+    max_abr = max(abrs) if abrs else None
+    max_asr = max(asrs) if asrs else None
 
-    # Format availability rules (as confirmed in user design interview):
-    # MP3: universally encodable at 320k CBR
+    # These are output conversions, not evidence of a lossless/studio source.
     is_mp3 = True
-    # FLAC: Lossless bit-perfect encode
-    is_flac = max_abr >= 60.0
-    # BluRay Hi-Res: Studio grade 24-bit 96kHz requires high-bitrate source audio (>= 150kbps)
-    is_bluray = max_abr >= 150.0
+    is_flac = True
+    is_bluray = True
 
     dur_sec = duration or 0
     m = int(dur_sec // 60)
@@ -1701,31 +1867,31 @@ def _inspect_track_formats(target, fallback_title=None, fallback_artist=None,
     if is_mp3:
         available_formats.append("mp3")
 
-    default_format = "bluray" if is_bluray else ("flac" if is_flac else "mp3")
+    default_format = 'mp3'
 
     formats_info = [
         {
             "id": "bluray",
-            "name": "BluRay Hi-Res Audio",
-            "sub": "24-bit / 96kHz Studio Master",
-            "badge": "Studio Master 96k/24b",
+            "name": "FLAC · Resampled 96kHz",
+            "sub": "Larger converted file; resampling does not improve source quality",
+            "badge": "Resampled output",
             "available": is_bluray,
             "est_size": f"~{round(dur_sec * 2300 / 8 / 1024, 1)} MB" if dur_sec else "~40-60 MB",
             "reason": "" if is_bluray else f"Source audio is below 160kbps ({round(max_abr)}kbps)"
         },
         {
             "id": "flac",
-            "name": "FLAC Lossless",
-            "sub": "Bit-perfect Lossless (16-bit / 44.1kHz)",
-            "badge": "Audiophile Lossless",
+            "name": "FLAC",
+            "sub": "Lossless output encoding; original source may be lossy",
+            "badge": "Converted FLAC",
             "available": is_flac,
             "est_size": f"~{round(dur_sec * 850 / 8 / 1024, 1)} MB" if dur_sec else "~15-25 MB",
             "reason": "" if is_flac else f"Source audio is below 60kbps ({round(max_abr)}kbps)"
         },
         {
             "id": "mp3",
-            "name": "MP3 320k",
-            "sub": "Universal Compatibility (320kbps CBR)",
+            "name": "MP3",
+            "sub": "High-quality VBR by default · compatible with most players",
             "badge": "Universal MP3",
             "available": is_mp3,
             "est_size": f"~{round(dur_sec * 320 / 8 / 1024, 1)} MB" if dur_sec else "~5-10 MB",
@@ -1743,7 +1909,7 @@ def _inspect_track_formats(target, fallback_title=None, fallback_artist=None,
         "duration_fmt": dur_fmt,
         "cover_url": cover_url,
         "source": source,
-        "max_abr": round(max_abr, 1),
+        "max_abr": round(max_abr, 1) if max_abr is not None else None,
         "max_asr": max_asr,
         "available_formats": available_formats,
         "default_format": default_format,
@@ -1885,21 +2051,26 @@ def _unique_path(path):
 
 
 def handle_spotify(spotify_url, output_dir, dirs, audio_format="mp3", audio_quality="0",
-                   progress_cb=None):
+                   progress_cb=None, cancel_check=None):
     """B3: resolve Spotify metadata ourselves, download via our yt-dlp pipeline,
     tag with mutagen (C1), dedupe through the shared archive, consistent naming."""
+    _check_cancel(cancel_check)
+    if not valid_query(spotify_url):
+        return {'status': 'error', 'error': 'Unsupported Spotify URL'}
     os.makedirs(output_dir, exist_ok=True)
     now = datetime.now().isoformat()
 
     try:
         tracks, source = get_spotify_tracks(spotify_url)
     except Exception as e:
+        _check_cancel(cancel_check)
         print(f"Own Spotify resolution failed ({e}); trying legacy spotdl", file=sys.stderr)
-        return _handle_spotify_legacy(spotify_url, output_dir, dirs, audio_format, audio_quality)
+        return _handle_spotify_legacy(spotify_url, output_dir, dirs, audio_format, audio_quality, cancel_check=cancel_check)
 
     results = []
 
     def _process(track):
+        _check_cancel(cancel_check)
         archive_key = f"spotify {track['id']}"
         if _archive_contains_key(dirs, archive_key):
             return {"status": "skipped", "query": spotify_url,
@@ -1912,7 +2083,7 @@ def handle_spotify(spotify_url, output_dir, dirs, audio_format="mp3", audio_qual
         res = download_single(query, output_dir, dirs, audio_format, audio_quality,
                               expected_duration=expected,
                               target_title=track.get("title"),
-                              target_artist=track.get("artist"))
+                              target_artist=track.get("artist"), cancel_check=cancel_check)
 
         if res.get("status") == "success":
             # Consistent naming from Spotify metadata
@@ -1953,30 +2124,28 @@ def handle_spotify(spotify_url, output_dir, dirs, audio_format="mp3", audio_qual
 
         return res
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = [executor.submit(_process, t) for t in tracks]
-        for fut in concurrent.futures.as_completed(futures):
-            try:
-                res = fut.result()
-            except Exception as e:
-                res = {"status": "error", "query": spotify_url, "error": str(e)}
-            log_download(dirs["log"], res)
-            results.append(res)
+    def process(track):
+        res = _process(track)
+        log_download(dirs['log'], res)
+        return res
+    results = _playlist_results(tracks, process, progress_cb, cancel_check)
 
     ok = sum(1 for x in results if x.get("status") == "success")
     skipped = sum(1 for x in results if x.get("status") == "skipped")
     return {"status": "playlist_done", "source": "spotify", "engine": "yt-dlp",
             "metadata_source": source,
-            "total": len(tracks), "downloaded": ok, "skipped": skipped, "results": results}
+            "total": len(tracks), "downloaded": ok, "skipped": skipped,
+            "failed": sum(x.get('status') == 'error' for x in results), "results": results}
 
 
-def _handle_spotify_legacy(spotify_url, output_dir, dirs, audio_format="mp3", audio_quality="0"):
+@_limited_download
+def _handle_spotify_legacy(spotify_url, output_dir, dirs, audio_format="mp3", audio_quality="0", cancel_check=None):
     """Legacy spotdl v4 path kept as fallback when own metadata resolution fails.
     Detects new files by before/after directory snapshot diff."""
     os.makedirs(output_dir, exist_ok=True)
 
     # Snapshot existing files before download
-    valid_exts = {".mp3", ".flac", ".m4a", ".wav", ".opus", ".aac", ".ogg"}
+    valid_exts = AUDIO_EXTENSIONS
     before = set()
     for f in os.listdir(output_dir):
         if os.path.splitext(f)[1].lower() in valid_exts:
@@ -1995,10 +2164,7 @@ def _handle_spotify_legacy(spotify_url, output_dir, dirs, audio_format="mp3", au
     ]
 
     try:
-        r = subprocess.run(
-            cmd, capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=300
-        )
+        r = _run_cancellable_command(cmd, 300, cancel_check)
     except subprocess.TimeoutExpired:
         return {"status": "error", "query": spotify_url,
                 "error": "spotdl download timed out after 5 minutes", "engine": "spotdl"}
@@ -2032,6 +2198,7 @@ def _handle_spotify_legacy(spotify_url, output_dir, dirs, audio_format="mp3", au
     results = []
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for fname in new_files:
+        _check_cancel(cancel_check)
         fpath = os.path.join(output_dir, fname)
         fsize = os.path.getsize(fpath) if os.path.exists(fpath) else 0
         raw_name = os.path.splitext(fname)[0]
@@ -2071,7 +2238,7 @@ def get_music_library(dirs):
     if not os.path.exists(music_dir):
         return []
 
-    valid_exts = {".mp3", ".flac", ".m4a", ".wav", ".opus", ".aac", ".ogg"}
+    valid_exts = AUDIO_EXTENSIONS
     library = []
 
     for filename in os.listdir(music_dir):
@@ -2190,7 +2357,9 @@ def _db_path(dirs):
 
 
 def _db_connect(path):
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=10.0)
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("""CREATE TABLE IF NOT EXISTS tracks(
         path TEXT PRIMARY KEY, filename TEXT, title TEXT, artist TEXT, format TEXT,
         size_mb REAL, date_added TEXT, mtime REAL, duration_sec REAL,
@@ -2210,11 +2379,13 @@ def _audio_duration(path):
 
 
 def sync_library_db(dirs):
-    """Reconcile the SQLite index with the filesystem. Returns per-filename stats."""
+    """Reconcile the SQLite index with the filesystem in a single pass.
+    Returns the complete enriched library list sorted newest first."""
     conn = _db_connect(_db_path(dirs))
     cur = conn.cursor()
-    valid_exts = {".mp3", ".flac", ".m4a", ".wav", ".opus", ".aac", ".ogg"}
+    valid_exts = AUDIO_EXTENSIONS
     music_dir = dirs["music"]
+    lyrics_dir = dirs.get("lyrics") or os.path.join(music_dir, ".lyrics")
     fs = {}
     if os.path.exists(music_dir):
         for fn in os.listdir(music_dir):
@@ -2226,17 +2397,21 @@ def sync_library_db(dirs):
                 except OSError:
                     pass
 
+    # Batch check what exists in tracks
+    existing_rows = {r[0]: (r[1], r[2]) for r in cur.execute("SELECT path, mtime, duration_sec FROM tracks").fetchall()}
+
     for p, st in fs.items():
-        row = cur.execute("SELECT mtime FROM tracks WHERE path=?", (p,)).fetchone()
-        if row is not None and abs((row[0] or 0) - st.st_mtime) <= 1:
+        existing = existing_rows.get(p)
+        if existing is not None and abs((existing[0] or 0) - st.st_mtime) <= 1:
             continue
         filename = os.path.basename(p)
+        ext = os.path.splitext(filename)[1].lower()
         raw = os.path.splitext(filename)[0]
         if " - " in raw:
             artist, title = raw.split(" - ", 1)
         else:
             artist, title = "Unknown", raw
-        dur = _audio_duration(p) if row is None else None
+        dur = _audio_duration(p) if (existing is None or existing[1] is None) else existing[1]
         cur.execute("""INSERT INTO tracks(path, filename, title, artist, format, size_mb,
                         date_added, mtime, duration_sec)
             VALUES(?,?,?,?,?,?,?,?,?)
@@ -2249,32 +2424,55 @@ def sync_library_db(dirs):
              datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
              st.st_mtime, dur))
 
-    for (p,) in cur.execute("SELECT path FROM tracks").fetchall():
+    for p in existing_rows:
         if p not in fs:
             cur.execute("DELETE FROM tracks WHERE path=?", (p,))
     conn.commit()
 
-    stats = {r[0]: {"play_count": r[1], "last_played": r[2], "duration_sec": r[3]}
-             for r in cur.execute("SELECT filename, play_count, last_played, duration_sec FROM tracks")}
+    rows = cur.execute("""SELECT path, filename, title, artist, format, size_mb,
+                                 date_added, duration_sec, play_count, last_played
+                          FROM tracks ORDER BY date_added DESC""").fetchall()
     conn.close()
-    return stats
+
+    # Quick set of existing lyric stems to avoid per-file filesystem checks
+    lyric_stems = set()
+    if os.path.exists(lyrics_dir):
+        try:
+            for l_fn in os.listdir(lyrics_dir):
+                if l_fn.endswith((".lrc", ".txt")):
+                    lyric_stems.add(os.path.splitext(l_fn)[0])
+        except Exception:
+            pass
+
+    library = []
+    for r in rows:
+        p, fn, title, artist, fmt, size_mb, dt_added, dur_sec, p_cnt, l_played = r
+        raw_stem = os.path.splitext(fn)[0]
+        safe_stem = _safe_stem(fn)
+        has_lrc = (raw_stem in lyric_stems) or (safe_stem in lyric_stems)
+        library.append({
+            "filename": fn,
+            "filepath": p,
+            "title": title,
+            "artist": artist,
+            "format": fmt,
+            "size_mb": size_mb,
+            "date_added": dt_added,
+            "has_lyrics": has_lrc,
+            "play_count": p_cnt or 0,
+            "last_played": l_played,
+            "duration_sec": dur_sec
+        })
+    return library
 
 
 def get_music_library_indexed(dirs):
-    """C2: library listing backed by the SQLite index. Same item shape as
-    get_music_library plus play_count/last_played/duration_sec extras."""
-    base = get_music_library(dirs)
+    """C2: unified library listing backed by SQLite and filesystem single-pass."""
     try:
-        stats = sync_library_db(dirs)
+        return sync_library_db(dirs)
     except Exception as e:
-        print(f"Library DB sync failed: {e}", file=sys.stderr)
-        stats = {}
-    for item in base:
-        s = stats.get(item["filename"]) or {}
-        item["play_count"] = s.get("play_count") or 0
-        item["last_played"] = s.get("last_played")
-        item["duration_sec"] = s.get("duration_sec")
-    return base
+        print(f"Unified Library sync failed ({e}); using filesystem fallback", file=sys.stderr)
+        return get_music_library(dirs)
 
 
 def record_play(dirs, filename):
@@ -2347,6 +2545,9 @@ def save_playlist(dirs, name, tracks):
     safe = _safe_playlist_name(name)
     if not safe:
         raise ValueError("Invalid playlist name")
+    if len(tracks) > 1000 or any(not isinstance(t, str) or os.path.basename(t) != t
+                               or os.path.splitext(t)[1].lower() not in AUDIO_EXTENSIONS for t in tracks):
+        raise ValueError('Playlist tracks must be audio filenames inside the library')
     path = os.path.join(_playlists_dir(dirs), f"{safe}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"name": safe, "tracks": [str(t) for t in tracks]}, f,
@@ -2391,6 +2592,8 @@ def export_m3u(dirs, name):
 
     lines = ["#EXTM3U"]
     for fn in (pl.get("tracks") or []):
+        if not isinstance(fn, str) or os.path.basename(fn) != fn or os.path.splitext(fn)[1].lower() not in AUDIO_EXTENSIONS:
+            continue
         full = os.path.join(dirs["music"], fn)
         if not os.path.exists(full):
             continue

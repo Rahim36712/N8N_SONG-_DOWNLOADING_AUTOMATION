@@ -10,7 +10,9 @@
 [![n8n Orchestrator](https://img.shields.io/badge/Orchestrator-n8n-FF6F61?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/)
 [![Windows](https://img.shields.io/badge/OS-Windows-0078D6?style=for-the-badge&logo=windows11&logoColor=white)](https://microsoft.com/)
 
-**An audiophile-grade automated song downloader, WebGL 3D streaming turntable, interactive 3D Coverflow deck, dual-language karaoke player, and n8n automation pipeline — for local use on Windows.**
+**A local music downloader and cream-and-olive hi-fi receiver, with a Coverflow deck, fullscreen karaoke, and n8n automation — for Windows.**
+
+Current audit fixes, verification instructions, and remaining runtime limits: [Implementation notes](IMPLEMENTATION_NOTES.md).
 
 [Features](#-key-features) • [Visual Previews](#-visual-previews) • [Architecture](#-system-architecture) • [Matching Pipeline](#-hybrid-matching--format-pipeline) • [API Reference](#-api-reference) • [Setup](#-installation--setup)
 
@@ -22,7 +24,12 @@
 
 <div align="center">
 
-### 3D WebGL Turntable & Audio Particle Visualizer
+### Current Retro Receiver (synthetic preview tracks)
+![Cream-and-olive retro receiver](assets/retro_receiver_preview.jpg)
+
+The remaining screenshots below are historical and may show superseded controls or quality labels.
+
+### Historical Player Preview (before the retro receiver update)
 ![AuraDisc Pro Turntable Stage](assets/player_stage.png)
 
 ### Real-Time Stream Inspection & Format Selection Modal
@@ -40,31 +47,31 @@
 ### 1. 🔍 Hybrid Matching Pipeline (Option A)
 - **Hard Title Token & Fuzzy Gates**: Disqualifies candidates with < 35% title token overlap by applying a -1000.0 penalty. High view counts (e.g. viral hits with 90M+ views) can never override the user's actual requested song.
 - **Phonetic & Transliteration Normalization**: Cleans bracketed tags, video noise (`[Official Audio]`, `(Official Music Video)`), repeated vowels/letters (`jaa` ↔ `ja`, `mein` ↔ `me`), and leverages `difflib` similarity (>= 0.80) to match transliteration variants (e.g. *muntasir* ~ *muntazir*).
-- **YouTube Music `- Topic` Preference**: Prioritizes official automated YouTube Music `- Topic` channel releases for bit-for-bit studio audio matching Spotify master releases with identical durations and zero spoken music-video intros.
+- **YouTube Music `- Topic` Preference**: Prioritizes official audio releases. Source selection does not establish studio-master fidelity or lossless quality.
 - **Adaptive Duration Window**: Seamlessly accommodates cinematic music video intros/outros for official videos (±50s to ±85s) when title overlap is high (>= 70%).
 - **Canonical Pre-Resolution via iTunes Search**: Plain-text searches query the iTunes Search API to resolve canonical track metadata (`title`, `artist`, `duration`, HD 600x600 artwork) for instant spelling correction.
 - **Full Spotify Single & Album Fidelity**: Seamlessly processes both direct Spotify track links and 1-track single albums, passing structured `target_title` and `target_artist` throughout the entire download pipeline.
 
 ### 2. 🎛️ Real-Time Dynamic Stream & Audio Format Inspection
 - **Inspect Stream Bitrate & Codecs**: Inspects source audio streams before downloading to determine maximum available bitrate (`max_abr`) and sample rate (`max_asr`).
-- **Dynamic Quality Badges**:
-  - **BluRay Hi-Res Audio (24-bit/96kHz)**: Automatically enabled when source audio >= 150 kbps; gracefully disabled with an explanatory badge (e.g. *Source audio is below 160kbps*) for standard uploads.
-  - **FLAC Lossless (16-bit/44.1kHz)**: Bit-perfect studio lossless audio.
-  - **MP3 320k (CBR)**: Universal compatibility.
-- **Pre-Selected Highest Quality**: Automatically selects the highest available audio quality with 1-click format switching.
+- **Output Conversion Choices**:
+  - **Resampled FLAC (96kHz)**: A larger converted file; resampling cannot restore missing source information. Legacy `bluray` API format identifiers remain supported.
+  - **FLAC**: Lossless output encoding; the original source may be lossy.
+  - **MP3**: High-quality VBR by default, with broad player compatibility.
+- **MP3 Default**: Format selection is explicit; unknown source bitrate is shown as unknown.
 - **Dedicated Single-Track Format Modal**: Displays track artwork, artist, title, duration, stream bitrate, and format cards before triggering download.
 - **Clean Command Bar**: Static format buttons removed from the top header for a clean, full-width search input.
 
 ### 3. 🎨 AuraDisc Pro 3D Player & Coverflow Deck
 - **AuraDisc Pro Design System**: White base + olive green accents (`#6B8E23`), Comfortaa typography app-wide, and Noto Nastaliq Urdu for authentic Urdu typography.
-- **3D WebGL Vinyl Turntable**: Rendered in real-time with Three.js r128 and custom shaders — dark olive vinyl with micro-grooves, procedural hub label drawn dynamically from playing audio, spin easing, and mouse-parallax tilt.
-- **Web Audio FFT Visualizer**: Real-time particle ring reacting to bass, mid, and treble frequencies.
+- **Retro Receiver Faceplate**: Cream surfaces, olive readouts, tactile transport keys, and static paper texture. The existing Coverflow layout is retained; the continuous WebGL background is removed.
 - **3D Coverflow Carousel Deck**: Interactive 3D coverflow carousel with 3D perspective tilt, smooth gliding, keyboard navigation, and cover art reflections.
 - **Self-Hosted & Offline-First**: Zero external CDNs at runtime. Tailwind Play runtime, Three.js, and FontAwesome 6.5.2 are fully vendor-bundled locally in `static/`.
 
 ### 4. 📥 Download Center & Resilient Async Queue
 - **Async ThreadPool Queue**: Downloads run in the background; UI streams real-time status and progress over **Server-Sent Events (SSE)** (`/api/jobs/<id>/events`).
 - **Dedicated Download Center Modal**: View individual card progress bars, active count badges, and overall batch progress.
+- **Recovery**: SSE reconnects with a polling fallback; refreshing the page restores in-memory server jobs. Failed downloads show their error and a retry action.
 - **Individual Remove & Dismiss Controls**: Completed, failed, or cancelled downloads feature a dedicated trash button to dismiss individual items, plus a top 'Clear Done' button.
 - **Reliable Terminal State Events**: SSE stream reliably communicates job completion and skips duplicate archived downloads with instant **100% Done** updates.
 
