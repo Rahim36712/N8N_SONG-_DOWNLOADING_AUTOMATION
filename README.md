@@ -8,6 +8,7 @@
 [![yt-dlp](https://img.shields.io/badge/Engine-yt--dlp-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://github.com/yt-dlp/yt-dlp)
 [![Three.js](https://img.shields.io/badge/3D-Three.js_WebGL-000000?style=for-the-badge&logo=threedotjs&logoColor=white)](https://threejs.org/)
 [![n8n Orchestrator](https://img.shields.io/badge/Orchestrator-n8n-FF6F61?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/)
+[![Pytest Tests](https://img.shields.io/badge/Tests-68%20Passed-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![Windows](https://img.shields.io/badge/OS-Windows-0078D6?style=for-the-badge&logo=windows11&logoColor=white)](https://microsoft.com/)
 
 **A local music downloader and cream-and-olive hi-fi receiver, with a Coverflow deck, fullscreen karaoke, and n8n automation — for Windows.**
@@ -217,7 +218,7 @@ python app.py            # -> Starts server on http://127.0.0.1:5000
 ```powershell
 python -m pytest tests/ -q
 ```
-Runs the 23 unit tests covering candidate scoring, hard title gates, phonetic normalization, token overlap, and lyric matching.
+Runs the **68 comprehensive automated tests** covering candidate scoring, hard title gates, phonetic normalization, token overlap, lyrics matching, app reliability, and frontend safety.
 
 ---
 
@@ -230,10 +231,13 @@ AUTOMATION-SONG/
 ├── assets/                            # Application screenshots & UI visual references
 │   ├── format_inspection_modal.png    # Choose Audio Format modal with inspected bitrate
 │   ├── download_center.png            # Live Download Center with cancel/dismiss controls
-│   └── player_stage.png               # 3D WebGL vinyl turntable & particle visualizer
-├── tests/
+│   ├── player_stage.png               # 3D WebGL vinyl turntable & particle visualizer
+│   └── retro_receiver_preview.jpg     # Cream-and-olive hi-fi retro receiver preview
+├── tests/                             # 68 Passing Automated Unit & Reliability Tests
 │   ├── test_candidate_selection.py    # Unit tests for Hybrid Option A candidate scoring & gates
-│   └── test_lyric_matching.py         # Unit tests for lyric candidate scoring & parsing
+│   ├── test_lyric_matching.py         # Unit tests for lyric candidate scoring & parsing
+│   ├── test_app_reliability.py        # Flask endpoint resilience, error handling & SSE jobs
+│   └── test_frontend_safety.py        # Template safety and contract assertions
 ├── templates/
 │   └── index.html                     # Monolithic offline-first frontend (Tailwind + Three.js)
 ├── static/
